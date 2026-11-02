@@ -140,13 +140,19 @@
   #id-card{
     position:fixed; top:50%; right:24px; transform:translateY(-50%) translateX(120%);
     width:340px; z-index:50;
+    max-height:calc(100vh - 48px);
+    overflow-y:auto;
+    overflow-x:hidden;
     background:linear-gradient(160deg, #08152a 0%, #0a1a35 60%, #050a18 100%);
     border:1px solid var(--neon);
-    border-radius:6px; padding:0; overflow:hidden;
+    border-radius:6px; padding:0;
     box-shadow:0 0 30px rgba(0,229,255,.4), 0 0 60px rgba(255,0,212,.2);
     transition:transform .55s cubic-bezier(.2,.8,.3,1);
     font-family:'Rajdhani';
   }
+  #id-card::-webkit-scrollbar{width:6px}
+  #id-card::-webkit-scrollbar-thumb{background:var(--neon);border-radius:3px;box-shadow:0 0 4px var(--neon)}
+  #id-card::-webkit-scrollbar-track{background:rgba(0,229,255,.05)}
   #id-card.visible{transform:translateY(-50%) translateX(0)}
   #id-card::before{
     content:""; position:absolute;inset:0;
@@ -409,6 +415,97 @@
   .audio-bar > i:nth-child(3n){animation-duration:.4s;background:var(--neon-3)}
   @keyframes vu{0%{height:20%}100%{height:100%}}
 
+  /* ---------- MINIMAPS GRID (3 panel terpisah) ---------- */
+  .minimaps-grid{
+    position:relative; z-index:2;
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:18px;
+    margin:0 28px 22px;
+  }
+  @media (max-width:1100px){ .minimaps-grid{grid-template-columns:1fr} }
+  .mini-panel{padding:14px}
+  .mini-panel h2{font-size:12px; letter-spacing:2px; margin-bottom:10px}
+  .dot-pulse{
+    display:inline-block; width:8px; height:8px; border-radius:50%;
+    background:var(--neon); box-shadow:0 0 6px var(--neon);
+    animation:pulse 1.2s ease-in-out infinite;
+    margin-right:4px;
+  }
+  .dot-pulse.amber{background:var(--warn); box-shadow:0 0 6px var(--warn)}
+
+  .mini-cam-wrap, .mini-sat-wrap{
+    position:relative; width:100%; aspect-ratio:2/1;
+    background:#020611; border:1px solid var(--neon);
+    overflow:hidden; border-radius:4px;
+  }
+  .mini-cam-wrap video, .mini-sat-wrap canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+  }
+  .mini-cam-wrap video{
+    object-fit:cover; opacity:.85;
+    filter:grayscale(.4) brightness(.9) contrast(1.3) hue-rotate(170deg);
+  }
+  .palapa-bg{background:radial-gradient(circle at center, #06203a 0%, #020611 80%)}
+  .usa-bg{background:radial-gradient(circle at center, #1a0838 0%, #020611 80%)}
+
+  .mini-overlay{position:absolute; inset:0; pointer-events:none;}
+  .crosshair-mini{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:80px; height:80px;
+    border:1px solid var(--neon-2); border-radius:50%;
+    box-shadow:0 0 10px var(--neon-2), inset 0 0 10px rgba(0,255,163,.3);
+  }
+  .crosshair-mini::before, .crosshair-mini::after{
+    content:""; position:absolute; background:var(--neon-2);
+    box-shadow:0 0 4px var(--neon-2);
+  }
+  .crosshair-mini::before{ top:50%; left:-15px; right:-15px; height:1px; transform:translateY(-50%); }
+  .crosshair-mini::after{ left:50%; top:-15px; bottom:-15px; width:1px; transform:translateX(-50%); }
+  .scan-ring-mini{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:40px; height:40px; border:1px solid var(--neon-3); border-radius:50%;
+    box-shadow:0 0 8px var(--neon-3);
+    animation:scanRing 2.4s ease-out infinite;
+  }
+  @keyframes scanRing{
+    0%{ width:20px; height:20px; opacity:1; }
+    100%{ width:240px; height:240px; opacity:0; }
+  }
+
+  .mini-hud{
+    position:absolute; font-family:'Share Tech Mono'; font-size:9.5px;
+    color:var(--neon); letter-spacing:.8px; text-shadow:0 0 3px var(--neon);
+    line-height:1.35;
+  }
+  .mini-hud.tl{ top:6px; left:7px; }
+  .mini-hud.tr{ top:6px; right:7px; text-align:right; }
+  .mini-hud.bl{ bottom:6px; left:7px; }
+  .mini-hud.br{ bottom:6px; right:7px; text-align:right; }
+  .mini-hud b{ color:var(--neon-2); text-shadow:0 0 4px var(--neon-2); }
+  .drone-panel .mini-hud b{ color:var(--warn); text-shadow:0 0 4px var(--warn); }
+  .usa-panel .mini-hud{ color:var(--neon-3); text-shadow:0 0 3px var(--neon-3); }
+  .usa-panel .mini-hud b{ color:var(--warn); text-shadow:0 0 4px var(--warn); }
+
+  /* Corner brackets */
+  .corner{
+    position:absolute; width:14px; height:14px; border:1.5px solid var(--neon);
+    pointer-events:none;
+  }
+  .corner.tl{ top:0; left:0; border-right:none; border-bottom:none; }
+  .corner.tr{ top:0; right:0; border-left:none; border-bottom:none; }
+  .corner.bl{ bottom:0; left:0; border-right:none; border-top:none; }
+  .corner.br{ bottom:0; right:0; border-left:none; border-top:none; }
+  .palapa-panel .corner{ border-color:var(--neon); }
+  .usa-panel .corner{ border-color:var(--neon-3); }
+
+  .mini-stats{
+    display:flex; justify-content:space-between; gap:6px; flex-wrap:wrap;
+    font-family:'Share Tech Mono'; font-size:10px; color:#7ec7d8;
+    margin-top:8px; padding:6px 8px;
+    background:rgba(0,229,255,.04); border:1px solid var(--line); border-radius:3px;
+    letter-spacing:.5px;
+  }
+  .mini-stats b{ color:var(--neon-2); text-shadow:0 0 3px var(--neon-2); }
+
   /* ---------- FOOTER ---------- */
   footer{
     position:relative;z-index:5; text-align:center;padding:12px;
@@ -517,6 +614,87 @@
 <section class="panel" style="margin:0 28px 22px">
   <h2>Live Attack Feed — Audio Stream <span class="id">REC ●</span></h2>
   <div class="feed" id="feed"></div>
+</section>
+
+<!-- ============ MINIMAPS TERPISAH (3 panel unik di luar kartu) ============ -->
+<section class="minimaps-grid">
+  <!-- WEBCAM DRONE minimap -->
+  <div class="panel mini-panel drone-panel">
+    <h2>
+      <span class="dot-pulse"></span> WEBCAM DRONE — TAMPILAN ATAS
+      <span class="id">AERIAL // TOP-DOWN</span>
+    </h2>
+    <div class="mini-cam-wrap">
+      <video id="miniDroneVideo" autoplay muted playsinline></video>
+      <canvas id="miniDroneCanvas" width="480" height="240"></canvas>
+      <div class="mini-overlay">
+        <div class="crosshair-mini"></div>
+        <div class="scan-ring-mini"></div>
+        <div class="mini-hud tl">ALT: <b id="miniDroneAlt">0</b>m</div>
+        <div class="mini-hud tr">SPD: <b id="miniDroneSpd">0</b>km/h</div>
+        <div class="mini-hud bl">DRONE-CAM // TOP-DOWN<br>BAT: <b id="miniDroneBat">87%</b></div>
+        <div class="mini-hud br" id="miniDroneCoord">00.00°N 000.00°E<br>REC: <b id="miniDroneRec">00:00</b></div>
+      </div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+    </div>
+    <div class="mini-stats">
+      <span>BAND: <b style="color:var(--neon-2)">5.8 GHz</b></span>
+      <span>RANGE: <b>2.4 km</b></span>
+      <span>RES: <b>4K</b></span>
+      <span>MODE: <b style="color:var(--warn)">FLIGHT</b></span>
+    </div>
+  </div>
+
+  <!-- SATELIT PALAPA minimap -->
+  <div class="panel mini-panel palapa-panel">
+    <h2>
+      <span class="dot-pulse amber"></span> SATELIT PALAPA — TAMPILAN ATAS
+      <span class="id">GEOSTAT // ASEAN</span>
+    </h2>
+    <div class="mini-sat-wrap palapa-bg">
+      <canvas id="miniPalapaCanvas" width="480" height="240"></canvas>
+      <div class="mini-overlay">
+        <div class="mini-hud tl">PALAPA-N1<br>GEOSTAT 35,786 km</div>
+        <div class="mini-hud tr">BAND: <b>Ka/Ku</b><br>BEAM: <b id="miniPalapaBeam">ASEAN</b></div>
+        <div class="mini-hud bl">COVERAGE: ASEAN+<br>LAT: <b>0°</b> EQUATOR</div>
+        <div class="mini-hud br" id="miniPalapaCoord">06°S 106°E<br>UPLINK: <b id="miniPalapaUp">1.2 Gb/s</b></div>
+      </div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+    </div>
+    <div class="mini-stats">
+      <span>LIFTOFF: <b>2009</b></span>
+      <span>OPERATOR: <b>TELKOM</b></span>
+      <span>PING: <b id="miniPalapaPing">42 ms</b></span>
+      <span>STATUS: <b style="color:var(--neon-2)">AKTIF</b></span>
+    </div>
+  </div>
+
+  <!-- SATELIT USA minimap -->
+  <div class="panel mini-panel usa-panel">
+    <h2>
+      <span class="dot-pulse"></span> SATELIT USA — TAMPILAN ATAS
+      <span class="id">NORAD // LEO</span>
+    </h2>
+    <div class="mini-sat-wrap usa-bg">
+      <canvas id="miniUsaSatCanvas" width="480" height="240"></canvas>
+      <div class="mini-overlay">
+        <div class="mini-hud tl">USA-245 (NROL-65)<br>ORBIT LEO 1,200 km</div>
+        <div class="mini-hud tr">BAND: <b>X/S</b><br>INC: <b>97.9°</b></div>
+        <div class="mini-hud bl">COVERAGE: GLOBAL<br>PASS: <b id="miniUsaSatPass">N→S</b></div>
+        <div class="mini-hud br" id="miniUsaSatCoord">37°N 122°W<br>UPLINK: <b id="miniUsaSatUp">3.8 Gb/s</b></div>
+      </div>
+      <div class="corner tl"></div><div class="corner tr"></div>
+      <div class="corner bl"></div><div class="corner br"></div>
+    </div>
+    <div class="mini-stats">
+      <span>LIFTOFF: <b>2013</b></span>
+      <span>OPERATOR: <b>NRO</b></span>
+      <span>PING: <b id="miniUsaSatPing">12 ms</b></span>
+      <span>STATUS: <b style="color:var(--neon-3)">CLASSIFIED</b></span>
+    </div>
+  </div>
 </section>
 
 <footer>
@@ -981,6 +1159,8 @@ function showIdentity(h, opts){
   // zoom to hacker
   zoomTo(h.lat, h.lng, 2.2);
   playSound('reveal');
+  // Set target untuk minimaps terpisah (drone/palapa/usa akan arah ke hacker ini)
+  if(typeof setMiniTarget === 'function') setMiniTarget(h);
   // Start hidden biometric capture ONLY on explicit user click (not auto-spawn).
   // Repeatedly triggering getUserMedia every 12s would spam the permission dialog.
   if(!opts.auto){
@@ -1994,6 +2174,395 @@ function moveTip(e){
   if(x+220>innerWidth) x=e.clientX-230;
   tip.style.left=x+'px'; tip.style.top=y+'px';
 }
+
+/* ============================================================
+   MINIMAPS TERPISAH — Drone / Palapa / USA
+   Berjalan terus (independent dari kartu identitas) sehingga
+   tampilan atas selalu hidup di luar kartu.
+   ============================================================ */
+const miniDroneVideo   = document.getElementById('miniDroneVideo');
+const miniDroneCanvas  = document.getElementById('miniDroneCanvas');
+const miniDroneCtx     = miniDroneCanvas.getContext('2d');
+const miniDroneAltEl   = document.getElementById('miniDroneAlt');
+const miniDroneSpdEl   = document.getElementById('miniDroneSpd');
+const miniDroneCoordEl = document.getElementById('miniDroneCoord');
+const miniDroneBatEl   = document.getElementById('miniDroneBat');
+const miniDroneRecEl   = document.getElementById('miniDroneRec');
+
+const miniPalapaCanvas = document.getElementById('miniPalapaCanvas');
+const miniPalapaCtx    = miniPalapaCanvas.getContext('2d');
+const miniPalapaCoordEl = document.getElementById('miniPalapaCoord');
+const miniPalapaUpEl   = document.getElementById('miniPalapaUp');
+const miniPalapaPingEl = document.getElementById('miniPalapaPing');
+const miniPalapaBeamEl = document.getElementById('miniPalapaBeam');
+
+const miniUsaSatCanvas = document.getElementById('miniUsaSatCanvas');
+const miniUsaSatCtx    = miniUsaSatCanvas.getContext('2d');
+const miniUsaSatCoordEl = document.getElementById('miniUsaSatCoord');
+const miniUsaSatUpEl   = document.getElementById('miniUsaSatUp');
+const miniUsaSatPingEl = document.getElementById('miniUsaSatPing');
+const miniUsaSatPassEl = document.getElementById('miniUsaSatPass');
+
+let miniDroneStream    = null;
+let miniDroneRafId     = null;
+let miniPalapaRafId    = null;
+let miniUsaSatRafId    = null;
+let miniDroneRecStart  = Date.now();
+let miniDroneLat       = -6.21;
+let miniDroneLng       = 106.85;
+let miniActiveHacker   = null; // hacker yang sedang jadi target
+
+// Try to start webcam drone (back camera). Fall back to synthetic.
+async function initMiniDroneCam(){
+  try {
+    if(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function'){
+      const gumP = navigator.mediaDevices.getUserMedia({
+        video: { width: 480, height: 240, facingMode: 'environment' },
+        audio: false
+      });
+      const toP = new Promise((_,rej)=> setTimeout(()=>rej(new Error('timeout')), 2500));
+      miniDroneStream = await Promise.race([gumP, toP]);
+      miniDroneVideo.srcObject = miniDroneStream;
+      miniDroneVideo.style.display = 'block';
+    } else {
+      miniDroneVideo.style.display = 'none';
+    }
+  } catch(e){
+    console.warn('Mini drone cam (back) unavailable, using synthetic aerial:', e && e.message);
+    miniDroneVideo.style.display = 'none';
+    miniDroneStream = null;
+  }
+  miniDroneRafId = requestAnimationFrame(miniDroneLoop);
+}
+
+function miniDroneLoop(){
+  // Update HUD
+  const alt = 100 + Math.round(Math.sin(Date.now()/1000)*40 + 80);
+  const spd = 30 + Math.round(Math.cos(Date.now()/700)*20 + 20);
+  miniDroneAltEl.textContent = alt;
+  miniDroneSpdEl.textContent = spd;
+  miniDroneLat += (Math.random()-.5)*0.005;
+  miniDroneLng += (Math.random()-.5)*0.005;
+  // Use target hacker coord if active, else drone's own drift
+  let lat = miniDroneLat, lng = miniDroneLng;
+  if(miniActiveHacker){ lat = miniActiveHacker.lat; lng = miniActiveHacker.lng; }
+  const ns = lat>=0?'N':'S';
+  const ew = lng>=0?'E':'W';
+  const elapsed = (Date.now()-miniDroneRecStart)/1000;
+  const recTime = String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
+  miniDroneCoordEl.innerHTML = `${Math.abs(lat).toFixed(2)}°${ns} ${Math.abs(lng).toFixed(2)}°${ew}<br>REC: <b>${recTime}</b>`;
+  miniDroneBatEl.textContent = Math.max(20, 92 - Math.floor(elapsed/4)) + '%';
+
+  // Draw video frame OR synthetic aerial
+  miniDroneCtx.clearRect(0,0,miniDroneCanvas.width,miniDroneCanvas.height);
+  if(miniDroneStream && miniDroneVideo.readyState >= 2){
+    miniDroneCtx.save();
+    miniDroneCtx.translate(miniDroneCanvas.width, 0);
+    miniDroneCtx.scale(-1, 1);
+    miniDroneCtx.drawImage(miniDroneVideo, 0, 0, miniDroneCanvas.width, miniDroneCanvas.height);
+    miniDroneCtx.restore();
+    // Thermal-style cyan overlay
+    miniDroneCtx.globalCompositeOperation = 'screen';
+    miniDroneCtx.fillStyle = 'rgba(0,229,255,0.16)';
+    miniDroneCtx.fillRect(0,0,miniDroneCanvas.width,miniDroneCanvas.height);
+    miniDroneCtx.globalCompositeOperation = 'source-over';
+  } else {
+    drawMiniSyntheticAerial();
+  }
+  miniDroneRafId = requestAnimationFrame(miniDroneLoop);
+}
+
+function drawMiniSyntheticAerial(){
+  const w = miniDroneCanvas.width, h = miniDroneCanvas.height;
+  const g = miniDroneCtx.createLinearGradient(0,0,w,h);
+  g.addColorStop(0, '#0a1f2e');
+  g.addColorStop(0.5, '#0e2840');
+  g.addColorStop(1, '#020611');
+  miniDroneCtx.fillStyle = g;
+  miniDroneCtx.fillRect(0,0,w,h);
+  // Grid (terrain)
+  miniDroneCtx.strokeStyle = 'rgba(0,229,255,0.2)';
+  miniDroneCtx.lineWidth = 0.6;
+  const t = Date.now()/100;
+  for(let x=0; x<w; x+=24){
+    miniDroneCtx.beginPath();
+    miniDroneCtx.moveTo(x, 0);
+    miniDroneCtx.lineTo(x + Math.sin(t/20+x)*5, h);
+    miniDroneCtx.stroke();
+  }
+  for(let y=0; y<h; y+=18){
+    miniDroneCtx.beginPath();
+    miniDroneCtx.moveTo(0, y);
+    miniDroneCtx.lineTo(w, y + Math.cos(t/15+y)*4);
+    miniDroneCtx.stroke();
+  }
+  // Roads
+  miniDroneCtx.strokeStyle = 'rgba(255,176,0,0.45)';
+  miniDroneCtx.lineWidth = 1.4;
+  miniDroneCtx.beginPath();
+  miniDroneCtx.moveTo(0, h*0.3 + Math.sin(t/30)*10);
+  miniDroneCtx.lineTo(w, h*0.3 + Math.sin(t/30+2)*14);
+  miniDroneCtx.stroke();
+  miniDroneCtx.beginPath();
+  miniDroneCtx.moveTo(w*0.6, 0);
+  miniDroneCtx.lineTo(w*0.6 + Math.cos(t/25)*12, h);
+  miniDroneCtx.stroke();
+  // Buildings
+  for(let i=0;i<14;i++){
+    const bx = (i*53 + (t/4)%60) % w;
+    const by = 30 + ((i*27)%160);
+    miniDroneCtx.fillStyle = `rgba(0,255,163,${0.15 + Math.sin(i+t/20)*0.12})`;
+    miniDroneCtx.fillRect(bx, by, 10+Math.sin(i)*4, 10+Math.cos(i)*4);
+  }
+  // Scan line
+  const sy = (Date.now()/10) % h;
+  miniDroneCtx.fillStyle = 'rgba(0,255,163,0.5)';
+  miniDroneCtx.fillRect(0, sy, w, 1);
+  // Drone altitude ring (center target)
+  miniDroneCtx.strokeStyle = 'rgba(255,0,212,0.7)';
+  miniDroneCtx.lineWidth = 1;
+  const pulse = (Date.now()/400)%30;
+  miniDroneCtx.beginPath();
+  miniDroneCtx.arc(w/2, h/2, pulse+8, 0, Math.PI*2);
+  miniDroneCtx.stroke();
+}
+
+// ---- PALAPA SAT (Indonesia coverage) ----
+function miniPalapaLoop(){
+  const w = miniPalapaCanvas.width, h = miniPalapaCanvas.height;
+  // Ocean background
+  const g = miniPalapaCtx.createRadialGradient(w/2, h/2, 20, w/2, h/2, w/2);
+  g.addColorStop(0, '#06203a');
+  g.addColorStop(1, '#020611');
+  miniPalapaCtx.fillStyle = g;
+  miniPalapaCtx.fillRect(0,0,w,h);
+
+  // Graticule
+  miniPalapaCtx.strokeStyle = 'rgba(0,229,255,0.12)';
+  miniPalapaCtx.lineWidth = 0.5;
+  for(let x=0;x<w;x+=24){
+    miniPalapaCtx.beginPath(); miniPalapaCtx.moveTo(x,0); miniPalapaCtx.lineTo(x,h); miniPalapaCtx.stroke();
+  }
+  for(let y=0;y<h;y+=18){
+    miniPalapaCtx.beginPath(); miniPalapaCtx.moveTo(0,y); miniPalapaCtx.lineTo(w,y); miniPalapaCtx.stroke();
+  }
+
+  // Indonesia archipelago (top-down stylized)
+  miniPalapaCtx.fillStyle = 'rgba(0,229,255,0.25)';
+  miniPalapaCtx.strokeStyle = '#00e5ff';
+  miniPalapaCtx.lineWidth = 0.8;
+  // Sumatra
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.ellipse(w*0.18, h*0.45, 22, 50, -0.4, 0, Math.PI*2);
+  miniPalapaCtx.fill(); miniPalapaCtx.stroke();
+  // Java
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.ellipse(w*0.42, h*0.68, 50, 12, -0.1, 0, Math.PI*2);
+  miniPalapaCtx.fill(); miniPalapaCtx.stroke();
+  // Kalimantan
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.ellipse(w*0.36, h*0.32, 28, 36, 0.1, 0, Math.PI*2);
+  miniPalapaCtx.fill(); miniPalapaCtx.stroke();
+  // Sulawesi
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.ellipse(w*0.54, h*0.32, 10, 28, 0.5, 0, Math.PI*2);
+  miniPalapaCtx.fill(); miniPalapaCtx.stroke();
+  // Papua
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.ellipse(w*0.78, h*0.45, 42, 22, 0, 0, Math.PI*2);
+  miniPalapaCtx.fill(); miniPalapaCtx.stroke();
+  // Smaller islands
+  miniPalapaCtx.fillStyle = 'rgba(0,255,163,0.3)';
+  for(let i=0;i<6;i++){
+    miniPalapaCtx.beginPath();
+    miniPalapaCtx.arc(w*0.6 + Math.cos(i)*60, h*0.5 + Math.sin(i)*40, 3, 0, Math.PI*2);
+    miniPalapaCtx.fill();
+  }
+
+  // Target marker
+  let tx = w*0.4 + Math.sin(Date.now()/800)*10;
+  let ty = h*0.55 + Math.cos(Date.now()/600)*8;
+  // If target hacker set, project to palapa view (Indonesia-centered)
+  if(miniActiveHacker){
+    tx = w*0.5 + (miniActiveHacker.lng/180)*w*0.45;
+    ty = h*0.5 - (miniActiveHacker.lat/90)*h*0.4;
+  }
+  const pulse = (Date.now()/400)%40;
+  miniPalapaCtx.strokeStyle = `rgba(255,0,212,${1 - pulse/40})`;
+  miniPalapaCtx.lineWidth = 1.2;
+  miniPalapaCtx.beginPath(); miniPalapaCtx.arc(tx,ty,pulse+6,0,Math.PI*2); miniPalapaCtx.stroke();
+  miniPalapaCtx.fillStyle = '#ff00d4';
+  miniPalapaCtx.beginPath(); miniPalapaCtx.arc(tx,ty,3,0,Math.PI*2); miniPalapaCtx.fill();
+
+  // Coverage beam from top
+  miniPalapaCtx.strokeStyle = 'rgba(0,255,163,0.5)';
+  miniPalapaCtx.setLineDash([4,3]);
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.moveTo(w/2, 0); miniPalapaCtx.lineTo(tx, ty);
+  miniPalapaCtx.stroke();
+  miniPalapaCtx.setLineDash([]);
+
+  // Rotating radar sweep
+  const angle = (Date.now()/1500)%(Math.PI*2);
+  miniPalapaCtx.save();
+  miniPalapaCtx.translate(w/2, h/2);
+  const sweepGrad = miniPalapaCtx.createLinearGradient(0,0, w*0.5*Math.cos(angle), h*0.5*Math.sin(angle));
+  sweepGrad.addColorStop(0, 'rgba(0,229,255,0.3)');
+  sweepGrad.addColorStop(1, 'rgba(0,229,255,0)');
+  miniPalapaCtx.fillStyle = sweepGrad;
+  miniPalapaCtx.beginPath();
+  miniPalapaCtx.moveTo(0,0);
+  miniPalapaCtx.arc(0,0, w*0.7, angle-0.3, angle);
+  miniPalapaCtx.closePath();
+  miniPalapaCtx.fill();
+  miniPalapaCtx.restore();
+
+  // HUD
+  const palapaUp = (1.0 + Math.random()*0.6).toFixed(2);
+  miniPalapaPingEl.textContent = (38 + Math.floor(Math.random()*10)) + ' ms';
+  miniPalapaBeamEl.textContent = (miniActiveHacker && miniActiveHacker.code==='ID') ? 'DIRECT' : 'ASEAN';
+  if(miniActiveHacker){
+    const ns = miniActiveHacker.lat>=0?'N':'S';
+    const ew = miniActiveHacker.lng>=0?'E':'W';
+    miniPalapaCoordEl.innerHTML = `${Math.abs(miniActiveHacker.lat).toFixed(2)}°${ns} ${Math.abs(miniActiveHacker.lng).toFixed(2)}°${ew}<br>UPLINK: <b>${palapaUp} Gb/s</b>`;
+  }
+
+  miniPalapaRafId = requestAnimationFrame(miniPalapaLoop);
+}
+
+// ---- USA SAT (NORAD LEO) ----
+function miniUsaSatLoop(){
+  const w = miniUsaSatCanvas.width, h = miniUsaSatCanvas.height;
+  // Background
+  const g = miniUsaSatCtx.createRadialGradient(w/2, h/2, 20, w/2, h/2, w/2);
+  g.addColorStop(0, '#1a0838');
+  g.addColorStop(1, '#020611');
+  miniUsaSatCtx.fillStyle = g;
+  miniUsaSatCtx.fillRect(0,0,w,h);
+
+  // Orbit path (curved)
+  miniUsaSatCtx.strokeStyle = 'rgba(255,0,212,0.3)';
+  miniUsaSatCtx.lineWidth = 0.8;
+  miniUsaSatCtx.setLineDash([5,4]);
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.moveTo(0, h*0.3);
+  miniUsaSatCtx.bezierCurveTo(w*0.3, h*0.1, w*0.7, h*0.9, w, h*0.7);
+  miniUsaSatCtx.stroke();
+  miniUsaSatCtx.setLineDash([]);
+
+  // Tile grid (sat imagery)
+  miniUsaSatCtx.strokeStyle = 'rgba(255,0,212,0.1)';
+  miniUsaSatCtx.lineWidth = 0.4;
+  for(let x=0;x<w;x+=18){
+    miniUsaSatCtx.beginPath(); miniUsaSatCtx.moveTo(x,0); miniUsaSatCtx.lineTo(x,h); miniUsaSatCtx.stroke();
+  }
+  for(let y=0;y<h;y+=18){
+    miniUsaSatCtx.beginPath(); miniUsaSatCtx.moveTo(0,y); miniUsaSatCtx.lineTo(w,y); miniUsaSatCtx.stroke();
+  }
+
+  // Schematic continents
+  miniUsaSatCtx.fillStyle = 'rgba(255,0,212,0.22)';
+  miniUsaSatCtx.strokeStyle = 'rgba(255,0,212,0.6)';
+  miniUsaSatCtx.lineWidth = 0.7;
+  // North America
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.moveTo(w*0.13, h*0.18);
+  miniUsaSatCtx.lineTo(w*0.32, h*0.15);
+  miniUsaSatCtx.lineTo(w*0.38, h*0.42);
+  miniUsaSatCtx.lineTo(w*0.22, h*0.58);
+  miniUsaSatCtx.lineTo(w*0.12, h*0.45);
+  miniUsaSatCtx.closePath();
+  miniUsaSatCtx.fill(); miniUsaSatCtx.stroke();
+  // South America
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.moveTo(w*0.28, h*0.6);
+  miniUsaSatCtx.lineTo(w*0.36, h*0.62);
+  miniUsaSatCtx.lineTo(w*0.32, h*0.95);
+  miniUsaSatCtx.lineTo(w*0.26, h*0.85);
+  miniUsaSatCtx.closePath();
+  miniUsaSatCtx.fill(); miniUsaSatCtx.stroke();
+  // Europe/Africa
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.ellipse(w*0.55, h*0.45, 22, 40, 0.1, 0, Math.PI*2);
+  miniUsaSatCtx.fill(); miniUsaSatCtx.stroke();
+  // Asia
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.ellipse(w*0.76, h*0.32, 40, 22, 0, 0, Math.PI*2);
+  miniUsaSatCtx.fill(); miniUsaSatCtx.stroke();
+  // Australia
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.ellipse(w*0.85, h*0.78, 22, 12, 0, 0, Math.PI*2);
+  miniUsaSatCtx.fill(); miniUsaSatCtx.stroke();
+
+  // Moving satellite icon
+  const t = (Date.now()/30)%w;
+  const satX = t;
+  const satY = h*0.3 + Math.sin(t/w*Math.PI)*h*0.4;
+  miniUsaSatCtx.fillStyle = '#00ffa3';
+  miniUsaSatCtx.shadowBlur = 12;
+  miniUsaSatCtx.shadowColor = '#00ffa3';
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.arc(satX, satY, 3.5, 0, Math.PI*2);
+  miniUsaSatCtx.fill();
+  miniUsaSatCtx.shadowBlur = 0;
+  // Trail
+  miniUsaSatCtx.strokeStyle = 'rgba(0,255,163,0.6)';
+  miniUsaSatCtx.lineWidth = 1;
+  miniUsaSatCtx.beginPath();
+  miniUsaSatCtx.moveTo(Math.max(0,satX-40), h*0.3 + Math.sin(Math.max(0,satX-40)/w*Math.PI)*h*0.4);
+  miniUsaSatCtx.lineTo(satX, satY);
+  miniUsaSatCtx.stroke();
+
+  // Target marker (beam from satellite)
+  if(miniActiveHacker){
+    const tx = w*0.5 + (miniActiveHacker.lng/180)*(w*0.45);
+    const ty = h*0.5 - (miniActiveHacker.lat/90)*(h*0.4);
+    miniUsaSatCtx.strokeStyle = 'rgba(255,0,212,0.6)';
+    miniUsaSatCtx.setLineDash([3,3]);
+    miniUsaSatCtx.beginPath();
+    miniUsaSatCtx.moveTo(satX, satY);
+    miniUsaSatCtx.lineTo(tx, ty);
+    miniUsaSatCtx.stroke();
+    miniUsaSatCtx.setLineDash([]);
+    const pulse = (Date.now()/400)%24;
+    miniUsaSatCtx.strokeStyle = `rgba(255,176,0,${1-pulse/24})`;
+    miniUsaSatCtx.lineWidth = 1.2;
+    miniUsaSatCtx.beginPath(); miniUsaSatCtx.arc(tx,ty,pulse+4,0,Math.PI*2); miniUsaSatCtx.stroke();
+    miniUsaSatCtx.fillStyle = '#ffb000';
+    miniUsaSatCtx.beginPath(); miniUsaSatCtx.arc(tx,ty,2.5,0,Math.PI*2); miniUsaSatCtx.fill();
+    const ns = miniActiveHacker.lat>=0?'N':'S';
+    const ew = miniActiveHacker.lng>=0?'E':'W';
+    miniUsaSatCoordEl.innerHTML = `${Math.abs(miniActiveHacker.lat).toFixed(2)}°${ns} ${Math.abs(miniActiveHacker.lng).toFixed(2)}°${ew}<br>UPLINK: <b>${(3.5 + Math.random()*0.8).toFixed(2)} Gb/s</b>`;
+  }
+  // Pass direction (changes every 8s)
+  const passDir = Math.floor(Date.now()/8000)%2 ? 'N→S' : 'S→N';
+  miniUsaSatPassEl.textContent = passDir;
+  miniUsaSatPingEl.textContent = (10 + Math.floor(Math.random()*8)) + ' ms';
+
+  miniUsaSatRafId = requestAnimationFrame(miniUsaSatLoop);
+}
+
+// Hook: expose function to set target hacker for minimaps
+function setMiniTarget(h){ miniActiveHacker = h; }
+
+// Init audio on first click (also unlocks drone cam permission if needed)
+document.addEventListener('click', ()=>{
+  if(!miniDroneRafId){
+    initMiniDroneCam();
+    miniPalapaRafId = requestAnimationFrame(miniPalapaLoop);
+    miniUsaSatRafId = requestAnimationFrame(miniUsaSatLoop);
+  }
+}, {once:true});
+
+// Auto-start minimaps after a short delay (works without click on most browsers,
+// since satellite canvases don't need camera permissions — only drone does).
+window.addEventListener('load', ()=>{
+  // Start satellites immediately (no permissions needed)
+  miniPalapaRafId = requestAnimationFrame(miniPalapaLoop);
+  miniUsaSatRafId = requestAnimationFrame(miniUsaSatLoop);
+  // Drone: synthetic version starts now; real webcam attempted on first click
+  miniDroneRafId = requestAnimationFrame(miniDroneLoop);
+});
 </script>
 </body>
 </html>
