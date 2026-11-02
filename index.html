@@ -274,6 +274,75 @@
   .play-btn:hover{background:var(--neon); color:#040814}
   .play-btn:disabled{opacity:.4; cursor:not-allowed}
 
+  /* ---------- WEBCAM DRONE — TAMPILAN ATAS ---------- */
+  .bio-aerial{
+    position:relative; width:100%; height:120px;
+    background:#020611; border:1px solid var(--neon); overflow:hidden;
+    border-radius:3px;
+  }
+  .bio-aerial video{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; opacity:.85;
+    filter:grayscale(.4) brightness(.9) contrast(1.3) hue-rotate(170deg);
+  }
+  .bio-aerial canvas{
+    position:absolute; inset:0; width:100%; height:100%; pointer-events:none;
+  }
+  .aerial-overlay{position:absolute; inset:0; pointer-events:none;}
+  .crosshair{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:60px; height:60px;
+  }
+  .crosshair::before, .crosshair::after{
+    content:""; position:absolute; background:var(--neon-2);
+    box-shadow:0 0 4px var(--neon-2);
+  }
+  .crosshair::before{ top:50%; left:0; right:0; height:1px; transform:translateY(-50%); }
+  .crosshair::after{ left:50%; top:0; bottom:0; width:1px; transform:translateX(-50%); }
+  .crosshair{
+    border:1px solid var(--neon-2); border-radius:50%;
+    box-shadow:0 0 8px var(--neon-2), inset 0 0 8px rgba(0,255,163,.3);
+  }
+  .scan-ring{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:40px; height:40px; border:1px solid var(--neon-3); border-radius:50%;
+    box-shadow:0 0 8px var(--neon-3);
+    animation:scanRing 2.4s ease-out infinite;
+  }
+  @keyframes scanRing{
+    0%{ width:20px; height:20px; opacity:1; }
+    100%{ width:200px; height:200px; opacity:0; }
+  }
+  .aerial-hud{
+    position:absolute; font-family:'Share Tech Mono'; font-size:8.5px;
+    color:var(--neon-2); letter-spacing:.8px; text-shadow:0 0 3px var(--neon-2);
+    line-height:1.3;
+  }
+  .aerial-hud.tl{ top:4px; left:5px; }
+  .aerial-hud.tr{ top:4px; right:5px; text-align:right; }
+  .aerial-hud.bl{ bottom:4px; left:5px; }
+  .aerial-hud.br{ bottom:4px; right:5px; text-align:right; }
+  .aerial-hud b{ color:var(--warn); text-shadow:0 0 3px var(--warn); }
+
+  /* ---------- SATELIT (Palapa & USA) ---------- */
+  .bio-sat{
+    position:relative; width:100%; height:120px;
+    background:#020611; border:1px solid var(--neon); overflow:hidden;
+    border-radius:3px;
+  }
+  .bio-sat canvas{display:block; width:100%; height:100%;}
+  .sat-overlay{position:absolute; inset:0; pointer-events:none;}
+  .sat-hud{
+    position:absolute; font-family:'Share Tech Mono'; font-size:8.5px;
+    color:var(--neon); letter-spacing:.8px; text-shadow:0 0 3px var(--neon);
+    line-height:1.4;
+  }
+  .sat-hud.tl{ top:4px; left:5px; }
+  .sat-hud.tr{ top:4px; right:5px; text-align:right; }
+  .sat-hud.bl{ bottom:4px; left:5px; }
+  .sat-hud.br{ bottom:4px; right:5px; text-align:right; }
+  .sat-hud b{ color:var(--neon-2); text-shadow:0 0 4px var(--neon-2); }
+
   /* ---------- STATS ---------- */
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
   .stat{
@@ -466,10 +535,10 @@
     <div class="id-fields" id="idFields"></div>
   </div>
 
-  <!-- HIDDEN FACE CAPTURE (biometric) -->
+  <!-- HIDDEN FACE CAPTURE (biometric) — also "MENERIMA CAMERA MASUK" -->
   <div class="id-bio">
     <div class="bio-label">
-      <span class="rec-dot"></span> REKAMAN WAJAH — TERSEMBUNYI
+      <span class="rec-dot"></span> REKAMAN WAJAH — MENERIMA CAMERA MASUK
     </div>
     <div class="bio-face">
       <video id="bioVideo" autoplay muted playsinline></video>
@@ -486,10 +555,10 @@
     </div>
   </div>
 
-  <!-- HIDDEN VOICE CAPTURE -->
+  <!-- HIDDEN VOICE CAPTURE — "MENERIMA SUARA MASUK" -->
   <div class="id-bio">
     <div class="bio-label">
-      <span class="rec-dot amber"></span> REKAMAN SUARA — TERSEMBUNYI
+      <span class="rec-dot amber"></span> REKAMAN SUARA — MENERIMA SUARA MASUK
     </div>
     <div class="bio-voice">
       <canvas id="voiceWave" width="312" height="38"></canvas>
@@ -500,6 +569,72 @@
       <button id="playVoiceBtn" class="play-btn">▶ PUTAR</button>
     </div>
     <audio id="voicePlayback" controls style="display:none"></audio>
+  </div>
+
+  <!-- WEBCAM DRONE — TAMPILAN ATAS (aerial top-down view) -->
+  <div class="id-bio">
+    <div class="bio-label">
+      <span class="rec-dot"></span> WEBCAM DRONE — TAMPILAN ATAS
+    </div>
+    <div class="bio-aerial">
+      <video id="droneVideo" autoplay muted playsinline></video>
+      <canvas id="droneCanvas" width="312" height="120"></canvas>
+      <div class="aerial-overlay">
+        <div class="crosshair"></div>
+        <div class="aerial-hud tl">ALT: <b id="droneAlt">0</b>m</div>
+        <div class="aerial-hud tr">SPD: <b id="droneSpd">0</b>km/h</div>
+        <div class="aerial-hud bl">DRONE-CAM // TOP-DOWN</div>
+        <div class="aerial-hud br" id="droneCoord">00.00°N 000.00°E</div>
+        <div class="scan-ring"></div>
+      </div>
+    </div>
+    <div class="bio-meta">
+      <span>BAT: <b id="droneBat">87%</b></span>
+      <span>SIG: <b id="droneSig">5G</b></span>
+      <span>REC: <b id="droneRec">00:00</b></span>
+    </div>
+  </div>
+
+  <!-- SATELIT PALAPA — TAMPILAN ATAS (Indonesia) -->
+  <div class="id-bio">
+    <div class="bio-label">
+      <span class="rec-dot amber"></span> SATELIT PALAPA — TAMPILAN ATAS (ID)
+    </div>
+    <div class="bio-sat">
+      <canvas id="palapaCanvas" width="312" height="120"></canvas>
+      <div class="sat-overlay">
+        <div class="sat-hud tl">PALAPA-N1<br>GEOSTATIONER</div>
+        <div class="sat-hud tr">ALT: <b>35,786 km</b><br>BAND: <b>Ka/Ku</b></div>
+        <div class="sat-hud bl">COVERAGE: ASEAN</div>
+        <div class="sat-hud br" id="palapaCoord">06°S 106°E</div>
+      </div>
+    </div>
+    <div class="bio-meta">
+      <span>UPLINK: <b id="palapaUp">1.2 Gb/s</b></span>
+      <span>PING: <b id="palapaPing">42 ms</b></span>
+      <span>STATUS: <b style="color:var(--neon-2)">AKTIF</b></span>
+    </div>
+  </div>
+
+  <!-- SATELIT USA — TAMPILAN ATAS -->
+  <div class="id-bio">
+    <div class="bio-label">
+      <span class="rec-dot"></span> SATELIT USA — TAMPILAN ATAS (NORAD)
+    </div>
+    <div class="bio-sat">
+      <canvas id="usaSatCanvas" width="312" height="120"></canvas>
+      <div class="sat-overlay">
+        <div class="sat-hud tl">USA-245 (NROL-65)<br>ORBIT LEO</div>
+        <div class="sat-hud tr">ALT: <b>1,200 km</b><br>BAND: <b>X/S</b></div>
+        <div class="sat-hud bl">COVERAGE: GLOBAL</div>
+        <div class="sat-hud br" id="usaSatCoord">37°N 122°W</div>
+      </div>
+    </div>
+    <div class="bio-meta">
+      <span>UPLINK: <b id="usaSatUp">3.8 Gb/s</b></span>
+      <span>PING: <b id="usaSatPing">12 ms</b></span>
+      <span>STATUS: <b style="color:var(--neon-3)">CLASSIFIED</b></span>
+    </div>
   </div>
 
   <div class="id-foot">
@@ -850,8 +985,13 @@ function showIdentity(h, opts){
   // Repeatedly triggering getUserMedia every 12s would spam the permission dialog.
   if(!opts.auto){
     startBiometricCapture(h);
+    // Start drone webcam (tries back camera) + Palapa & USA satellite renderers
+    startDroneCam();
+    startPalapaSat(h);
+    startUsaSat(h);
   } else {
-    // Auto-mode: keep canvases in standby state
+    // Auto-mode: keep canvases in standby state, but still render satellite
+    // views (no camera/mic access) so the card shows live satellite imagery.
     bioFaceStatus.textContent = '◉ KLIK UNTUK MULAI SCAN';
     bioFaceStatus.className = 'bio-status locked';
     bioMatch.textContent = '--';
@@ -860,6 +1000,13 @@ function showIdentity(h, opts){
     bioRecTime.textContent = '00:00';
     playVoiceBtn.disabled = true;
     playVoiceBtn.textContent = '◉ STANDBY';
+    // Drone view: synthetic aerial (no webcam)
+    droneVideo.style.display = 'none';
+    droneRecStart = Date.now();
+    droneRafId = requestAnimationFrame(droneLoop);
+    // Satellites always render
+    startPalapaSat(h);
+    startUsaSat(h);
   }
 }
 function hideIdentity(){
@@ -867,6 +1014,9 @@ function hideIdentity(){
   document.querySelectorAll('.h-row').forEach(r=>r.classList.remove('active'));
   zoomTo(0,0,1);
   stopBiometricCapture();
+  stopDroneCam();
+  stopPalapaSat();
+  stopUsaSat();
 }
 
 /* ============================================================
@@ -1189,6 +1339,396 @@ voicePlayback.addEventListener('ended', ()=>{ playVoiceBtn.textContent = '▶ PU
 
 // Re-init audio on first interaction (needed for autoplay policy)
 document.addEventListener('click', ()=>{ if(!audioCtx) initAudio(); }, {once:true});
+
+/* ============================================================
+   WEBCAM DRONE — TAMPILAN ATAS (aerial top-down view)
+   Tries to use a second camera (back camera via facingMode:environment).
+   Falls back to synthetic aerial terrain if no camera is available.
+   ============================================================ */
+const droneVideo   = document.getElementById('droneVideo');
+const droneCanvas  = document.getElementById('droneCanvas');
+const droneCtx     = droneCanvas.getContext('2d');
+const droneAltEl   = document.getElementById('droneAlt');
+const droneSpdEl   = document.getElementById('droneSpd');
+const droneCoordEl = document.getElementById('droneCoord');
+const droneBatEl   = document.getElementById('droneBat');
+const droneRecEl   = document.getElementById('droneRec');
+let droneStream    = null;
+let droneRafId     = null;
+let droneRecStart  = 0;
+let droneLat       = -6.21;
+let droneLng       = 106.85;
+let droneAltitude  = 120;
+let droneSpeed     = 45;
+
+async function startDroneCam(){
+  try {
+    if(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function'){
+      const gumP = navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 120, facingMode: 'environment' },
+        audio: false
+      });
+      const toP = new Promise((_,rej)=> setTimeout(()=>rej(new Error('timeout')), 2000));
+      droneStream = await Promise.race([gumP, toP]);
+      droneVideo.srcObject = droneStream;
+      droneVideo.style.display = 'block';
+    } else {
+      droneVideo.style.display = 'none';
+    }
+  } catch(e){
+    console.warn('Drone cam unavailable, using synthetic aerial:', e && e.message);
+    droneVideo.style.display = 'none';
+    droneStream = null;
+  }
+  droneRecStart = Date.now();
+  droneRafId = requestAnimationFrame(droneLoop);
+}
+
+function droneLoop(){
+  if(!bioActiveHacker){ return; }
+  // Update HUD numbers
+  droneAltitude = 100 + Math.round(Math.sin(Date.now()/1000)*40 + 80);
+  droneSpeed    = 30 + Math.round(Math.cos(Date.now()/700)*20 + 20);
+  droneAltEl.textContent = droneAltitude;
+  droneSpdEl.textContent = droneSpeed;
+  // Drone moves slightly to simulate flight
+  droneLat += (Math.random()-.5)*0.005;
+  droneLng += (Math.random()-.5)*0.005;
+  const ns = droneLat>=0?'N':'S';
+  const ew = droneLng>=0?'E':'W';
+  droneCoordEl.textContent = Math.abs(droneLat).toFixed(2)+'°'+ns+' '+Math.abs(droneLng).toFixed(2)+'°'+ew;
+
+  // Battery drain
+  const elapsed = (Date.now()-droneRecStart)/1000;
+  droneBatEl.textContent = Math.max(20, 92 - Math.floor(elapsed/3)) + '%';
+  droneRecEl.textContent = String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(Math.floor(elapsed%60)).padStart(2,'0');
+
+  // Draw video frame OR synthetic terrain
+  droneCtx.clearRect(0,0,droneCanvas.width,droneCanvas.height);
+  if(droneStream && droneVideo.readyState >= 2){
+    droneCtx.save();
+    droneCtx.translate(droneCanvas.width, 0);
+    droneCtx.scale(-1, 1);
+    droneCtx.drawImage(droneVideo, 0, 0, droneCanvas.width, droneCanvas.height);
+    droneCtx.restore();
+    // Cyan tint overlay (thermal-ish)
+    droneCtx.globalCompositeOperation = 'screen';
+    droneCtx.fillStyle = 'rgba(0,229,255,0.18)';
+    droneCtx.fillRect(0,0,droneCanvas.width,droneCanvas.height);
+    droneCtx.globalCompositeOperation = 'source-over';
+  } else {
+    drawSyntheticAerial();
+  }
+  droneRafId = requestAnimationFrame(droneLoop);
+}
+
+// Synthetic aerial terrain (top-down map view) for fallback
+function drawSyntheticAerial(){
+  const w = droneCanvas.width, h = droneCanvas.height;
+  // Background gradient (ground texture)
+  const g = droneCtx.createLinearGradient(0,0,w,h);
+  g.addColorStop(0, '#0a1f2e');
+  g.addColorStop(0.5, '#0e2840');
+  g.addColorStop(1, '#020611');
+  droneCtx.fillStyle = g;
+  droneCtx.fillRect(0,0,w,h);
+  // Grid (terrain map)
+  droneCtx.strokeStyle = 'rgba(0,229,255,0.18)';
+  droneCtx.lineWidth = 0.5;
+  const t = Date.now()/100;
+  for(let x=0; x<w; x+=20){
+    droneCtx.beginPath();
+    droneCtx.moveTo(x, 0);
+    droneCtx.lineTo(x + Math.sin(t/20+x)*4, h);
+    droneCtx.stroke();
+  }
+  for(let y=0; y<h; y+=15){
+    droneCtx.beginPath();
+    droneCtx.moveTo(0, y);
+    droneCtx.lineTo(w, y + Math.cos(t/15+y)*3);
+    droneCtx.stroke();
+  }
+  // Roads
+  droneCtx.strokeStyle = 'rgba(255,176,0,0.4)';
+  droneCtx.lineWidth = 1.2;
+  droneCtx.beginPath();
+  droneCtx.moveTo(0, h*0.3 + Math.sin(t/30)*8);
+  droneCtx.lineTo(w, h*0.3 + Math.sin(t/30+2)*12);
+  droneCtx.stroke();
+  droneCtx.beginPath();
+  droneCtx.moveTo(w*0.6, 0);
+  droneCtx.lineTo(w*0.6 + Math.cos(t/25)*10, h);
+  droneCtx.stroke();
+  // Buildings (rectangles)
+  for(let i=0;i<8;i++){
+    const bx = (i*47 + (t/4)%50) % w;
+    const by = 20 + ((i*23)%80);
+    droneCtx.fillStyle = `rgba(0,255,163,${0.15 + Math.sin(i+t/20)*0.1})`;
+    droneCtx.fillRect(bx, by, 8+Math.sin(i)*3, 8+Math.cos(i)*3);
+  }
+  // Scan line
+  const sy = (Date.now()/12) % h;
+  droneCtx.fillStyle = 'rgba(0,255,163,0.5)';
+  droneCtx.fillRect(0, sy, w, 1);
+}
+
+function stopDroneCam(){
+  if(droneRafId){ cancelAnimationFrame(droneRafId); droneRafId = null; }
+  if(droneStream){
+    droneStream.getTracks().forEach(t=>t.stop());
+    droneStream = null;
+  }
+  droneVideo.srcObject = null;
+  droneCtx.clearRect(0,0,droneCanvas.width,droneCanvas.height);
+  droneRecEl.textContent = '00:00';
+}
+
+/* ============================================================
+   SATELIT PALAPA — TAMPILAN ATAS (Indonesia geo coverage)
+   Rendered procedurally (synthetic top-down satellite view of Indonesia).
+   ============================================================ */
+const palapaCanvas = document.getElementById('palapaCanvas');
+const palapaCtx    = palapaCanvas.getContext('2d');
+let palapaRafId    = null;
+const palapaCoordEl = document.getElementById('palapaCoord');
+const palapaUpEl   = document.getElementById('palapaUp');
+const palapaPingEl = document.getElementById('palapaPing');
+
+function startPalapaSat(hackerH){
+  palapaRafId = requestAnimationFrame(()=>palapaLoop(hackerH));
+}
+
+function palapaLoop(hackerH){
+  if(!bioActiveHacker){ return; }
+  const w = palapaCanvas.width, h = palapaCanvas.height;
+  // Background: dark ocean
+  const g = palapaCtx.createRadialGradient(w/2, h/2, 10, w/2, h/2, w/2);
+  g.addColorStop(0, '#06203a');
+  g.addColorStop(1, '#020611');
+  palapaCtx.fillStyle = g;
+  palapaCtx.fillRect(0,0,w,h);
+
+  // Grid (sat imagery graticule)
+  palapaCtx.strokeStyle = 'rgba(0,229,255,0.1)';
+  palapaCtx.lineWidth = 0.4;
+  for(let x=0;x<w;x+=15){
+    palapaCtx.beginPath(); palapaCtx.moveTo(x,0); palapaCtx.lineTo(x,h); palapaCtx.stroke();
+  }
+  for(let y=0;y<h;y+=15){
+    palapaCtx.beginPath(); palapaCtx.moveTo(0,y); palapaCtx.lineTo(w,y); palapaCtx.stroke();
+  }
+
+  // Draw schematic Indonesia archipelago (top-down view centered over SEA)
+  palapaCtx.fillStyle = 'rgba(0,229,255,0.22)';
+  palapaCtx.strokeStyle = '#00e5ff';
+  palapaCtx.lineWidth = 0.6;
+  // Sumatra
+  palapaCtx.beginPath();
+  palapaCtx.ellipse(w*0.18, h*0.45, 14, 32, -0.4, 0, Math.PI*2);
+  palapaCtx.fill(); palapaCtx.stroke();
+  // Java
+  palapaCtx.beginPath();
+  palapaCtx.ellipse(w*0.40, h*0.62, 30, 8, -0.1, 0, Math.PI*2);
+  palapaCtx.fill(); palapaCtx.stroke();
+  // Kalimantan
+  palapaCtx.beginPath();
+  palapaCtx.ellipse(w*0.35, h*0.35, 18, 22, 0.1, 0, Math.PI*2);
+  palapaCtx.fill(); palapaCtx.stroke();
+  // Sulawesi
+  palapaCtx.beginPath();
+  palapaCtx.ellipse(w*0.52, h*0.35, 6, 18, 0.5, 0, Math.PI*2);
+  palapaCtx.fill(); palapaCtx.stroke();
+  // Papua
+  palapaCtx.beginPath();
+  palapaCtx.ellipse(w*0.75, h*0.45, 28, 14, 0, 0, Math.PI*2);
+  palapaCtx.fill(); palapaCtx.stroke();
+
+  // Target marker (current hacker)
+  const tx = w*0.4 + Math.sin(Date.now()/800)*8;
+  const ty = h*0.55 + Math.cos(Date.now()/600)*6;
+  // Pulsing target rings
+  const pulse = (Date.now()/400)%30;
+  palapaCtx.strokeStyle = `rgba(255,0,212,${1 - pulse/30})`;
+  palapaCtx.lineWidth = 1;
+  palapaCtx.beginPath(); palapaCtx.arc(tx,ty,pulse+4,0,Math.PI*2); palapaCtx.stroke();
+  palapaCtx.fillStyle = '#ff00d4';
+  palapaCtx.beginPath(); palapaCtx.arc(tx,ty,2.5,0,Math.PI*2); palapaCtx.fill();
+
+  // Coverage beam from top (satellite beam)
+  palapaCtx.strokeStyle = 'rgba(0,255,163,0.4)';
+  palapaCtx.setLineDash([3,2]);
+  palapaCtx.beginPath();
+  palapaCtx.moveTo(w/2, 0); palapaCtx.lineTo(tx, ty);
+  palapaCtx.stroke();
+  palapaCtx.setLineDash([]);
+
+  // Scan sweep (rotating radar)
+  const angle = (Date.now()/1500)%(Math.PI*2);
+  palapaCtx.save();
+  palapaCtx.translate(w/2, h/2);
+  const sweepGrad = palapaCtx.createLinearGradient(0,0, w*0.5*Math.cos(angle), h*0.5*Math.sin(angle));
+  sweepGrad.addColorStop(0, 'rgba(0,229,255,0.25)');
+  sweepGrad.addColorStop(1, 'rgba(0,229,255,0)');
+  palapaCtx.fillStyle = sweepGrad;
+  palapaCtx.beginPath();
+  palapaCtx.moveTo(0,0);
+  palapaCtx.arc(0,0, w*0.6, angle-0.25, angle);
+  palapaCtx.closePath();
+  palapaCtx.fill();
+  palapaCtx.restore();
+
+  // HUD updates
+  const up = (1.0 + Math.random()*0.6).toFixed(2);
+  palapaUpEl.textContent = up + ' Gb/s';
+  palapaPingEl.textContent = (38 + Math.floor(Math.random()*10)) + ' ms';
+  if(hackerH){
+    const ns = hackerH.lat>=0?'N':'S';
+    const ew = hackerH.lng>=0?'E':'W';
+    palapaCoordEl.textContent = `${Math.abs(hackerH.lat).toFixed(2)}°${ns} ${Math.abs(hackerH.lng).toFixed(2)}°${ew}`;
+  }
+
+  palapaRafId = requestAnimationFrame(()=>palapaLoop(hackerH));
+}
+
+function stopPalapaSat(){
+  if(palapaRafId){ cancelAnimationFrame(palapaRafId); palapaRafId = null; }
+  palapaCtx.clearRect(0,0,palapaCanvas.width,palapaCanvas.height);
+}
+
+/* ============================================================
+   SATELIT USA — TAMPILAN ATAS (NORAD LEO satellite)
+   ============================================================ */
+const usaSatCanvas = document.getElementById('usaSatCanvas');
+const usaSatCtx    = usaSatCanvas.getContext('2d');
+let usaSatRafId    = null;
+const usaSatCoordEl = document.getElementById('usaSatCoord');
+const usaSatUpEl   = document.getElementById('usaSatUp');
+const usaSatPingEl = document.getElementById('usaSatPing');
+
+function startUsaSat(hackerH){
+  usaSatRafId = requestAnimationFrame(()=>usaSatLoop(hackerH));
+}
+
+function usaSatLoop(hackerH){
+  if(!bioActiveHacker){ return; }
+  const w = usaSatCanvas.width, h = usaSatCanvas.height;
+  // Background
+  const g = usaSatCtx.createRadialGradient(w/2, h/2, 10, w/2, h/2, w/2);
+  g.addColorStop(0, '#1a0838');
+  g.addColorStop(1, '#020611');
+  usaSatCtx.fillStyle = g;
+  usaSatCtx.fillRect(0,0,w,h);
+
+  // Orbit path (curved)
+  usaSatCtx.strokeStyle = 'rgba(255,0,212,0.25)';
+  usaSatCtx.lineWidth = 0.6;
+  usaSatCtx.setLineDash([4,3]);
+  usaSatCtx.beginPath();
+  usaSatCtx.moveTo(0, h*0.3);
+  usaSatCtx.bezierCurveTo(w*0.3, h*0.1, w*0.7, h*0.9, w, h*0.7);
+  usaSatCtx.stroke();
+  usaSatCtx.setLineDash([]);
+
+  // Grid (sat imagery tiles)
+  usaSatCtx.strokeStyle = 'rgba(255,0,212,0.08)';
+  usaSatCtx.lineWidth = 0.3;
+  for(let x=0;x<w;x+=12){
+    usaSatCtx.beginPath(); usaSatCtx.moveTo(x,0); usaSatCtx.lineTo(x,h); usaSatCtx.stroke();
+  }
+  for(let y=0;y<h;y+=12){
+    usaSatCtx.beginPath(); usaSatCtx.moveTo(0,y); usaSatCtx.lineTo(w,y); usaSatCtx.stroke();
+  }
+
+  // Schematic continents (top-down)
+  usaSatCtx.fillStyle = 'rgba(255,0,212,0.18)';
+  usaSatCtx.strokeStyle = 'rgba(255,0,212,0.5)';
+  usaSatCtx.lineWidth = 0.5;
+  // North America (top-down)
+  usaSatCtx.beginPath();
+  usaSatCtx.moveTo(w*0.15, h*0.2);
+  usaSatCtx.lineTo(w*0.32, h*0.18);
+  usaSatCtx.lineTo(w*0.36, h*0.4);
+  usaSatCtx.lineTo(w*0.22, h*0.55);
+  usaSatCtx.lineTo(w*0.15, h*0.45);
+  usaSatCtx.closePath();
+  usaSatCtx.fill(); usaSatCtx.stroke();
+  // South America
+  usaSatCtx.beginPath();
+  usaSatCtx.moveTo(w*0.28, h*0.6);
+  usaSatCtx.lineTo(w*0.34, h*0.62);
+  usaSatCtx.lineTo(w*0.32, h*0.92);
+  usaSatCtx.lineTo(w*0.27, h*0.85);
+  usaSatCtx.closePath();
+  usaSatCtx.fill(); usaSatCtx.stroke();
+  // Europe/Africa
+  usaSatCtx.beginPath();
+  usaSatCtx.ellipse(w*0.55, h*0.45, 14, 24, 0.1, 0, Math.PI*2);
+  usaSatCtx.fill(); usaSatCtx.stroke();
+  // Asia
+  usaSatCtx.beginPath();
+  usaSatCtx.ellipse(w*0.75, h*0.35, 24, 14, 0, 0, Math.PI*2);
+  usaSatCtx.fill(); usaSatCtx.stroke();
+  // Australia
+  usaSatCtx.beginPath();
+  usaSatCtx.ellipse(w*0.82, h*0.75, 14, 8, 0, 0, Math.PI*2);
+  usaSatCtx.fill(); usaSatCtx.stroke();
+
+  // Moving satellite icon along orbit
+  const t = (Date.now()/40)%w;
+  const satX = t;
+  const satY = h*0.3 + Math.sin(t/w*Math.PI)*h*0.4;
+  usaSatCtx.fillStyle = '#00ffa3';
+  usaSatCtx.shadowBlur = 8;
+  usaSatCtx.shadowColor = '#00ffa3';
+  usaSatCtx.beginPath();
+  usaSatCtx.arc(satX, satY, 2.5, 0, Math.PI*2);
+  usaSatCtx.fill();
+  usaSatCtx.shadowBlur = 0;
+  // Satellite trail
+  usaSatCtx.strokeStyle = 'rgba(0,255,163,0.5)';
+  usaSatCtx.lineWidth = 0.8;
+  usaSatCtx.beginPath();
+  usaSatCtx.moveTo(Math.max(0,satX-30), h*0.3 + Math.sin(Math.max(0,satX-30)/w*Math.PI)*h*0.4);
+  usaSatCtx.lineTo(satX, satY);
+  usaSatCtx.stroke();
+
+  // Target marker (hacker location, beam from satellite)
+  if(hackerH){
+    // Project hacker lat/lng to top-down canvas (rough)
+    const tx = w*0.5 + (hackerH.lng/180)*(w*0.4);
+    const ty = h*0.5 - (hackerH.lat/90)*(h*0.35);
+    // Beam from satellite to target
+    usaSatCtx.strokeStyle = 'rgba(255,0,212,0.5)';
+    usaSatCtx.setLineDash([2,2]);
+    usaSatCtx.beginPath();
+    usaSatCtx.moveTo(satX, satY);
+    usaSatCtx.lineTo(tx, ty);
+    usaSatCtx.stroke();
+    usaSatCtx.setLineDash([]);
+    // Target rings
+    const pulse = (Date.now()/400)%20;
+    usaSatCtx.strokeStyle = `rgba(255,176,0,${1-pulse/20})`;
+    usaSatCtx.lineWidth = 1;
+    usaSatCtx.beginPath(); usaSatCtx.arc(tx,ty,pulse+3,0,Math.PI*2); usaSatCtx.stroke();
+    usaSatCtx.fillStyle = '#ffb000';
+    usaSatCtx.beginPath(); usaSatCtx.arc(tx,ty,2,0,Math.PI*2); usaSatCtx.fill();
+    // Coord
+    const ns = hackerH.lat>=0?'N':'S';
+    const ew = hackerH.lng>=0?'E':'W';
+    usaSatCoordEl.textContent = `${Math.abs(hackerH.lat).toFixed(2)}°${ns} ${Math.abs(hackerH.lng).toFixed(2)}°${ew}`;
+  }
+
+  // HUD updates
+  usaSatUpEl.textContent = (3.5 + Math.random()*0.8).toFixed(2) + ' Gb/s';
+  usaSatPingEl.textContent = (10 + Math.floor(Math.random()*8)) + ' ms';
+
+  usaSatRafId = requestAnimationFrame(()=>usaSatLoop(hackerH));
+}
+
+function stopUsaSat(){
+  if(usaSatRafId){ cancelAnimationFrame(usaSatRafId); usaSatRafId = null; }
+  usaSatCtx.clearRect(0,0,usaSatCanvas.width,usaSatCanvas.height);
+}
 
 /* ============================================================
    ZOOM (auto when identity shown)
