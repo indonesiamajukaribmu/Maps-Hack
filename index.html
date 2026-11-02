@@ -588,10 +588,11 @@ const baseProjection = d3.geoNaturalEarth1().scale(180).translate([W/2, H/2]);
 let projection = baseProjection;
 let zoomK = 1, zoomX = 0, zoomY = 0;
 const geoPath = d3.geoPath(projection);
+// Project [lat, lng] to base pixel {x, y}. Zoom is applied via CSS transform
+// on the SVG element (see reprojectLand()), so this stays zoom-agnostic.
 function proj(lat, lng){
   const p = projection([lng, lat]);
-  if(!p) return null;
-  return {x: p[0]*zoomK + zoomX, y: p[1]*zoomK + zoomY};
+  return p ? {x:p[0], y:p[1]} : null;
 }
 
 /* ============================================================
@@ -641,13 +642,37 @@ const svg     = document.getElementById('world-svg');
 const hackerStates = {}; // per-hacker runtime state: position, trail, range
 
 function renderAll(){
+  // Preserve existing hackerStates so trails/ranges survive re-renders (e.g. when
+  // spawnNewHacker re-sorts the HACKERS array and rebuilds dots).
+  const prevStates = hackerStates;
+  for(const k in prevStates){ prevStates[k]._aliasKey = prevStates[k]._aliasKey || ''; }
+
   nodesG.innerHTML=''; hotsG.innerHTML=''; arcsG.innerHTML='';
   rangesG.innerHTML=''; trailsG.innerHTML='';
+
+  // Build alias -> state map from previous run
+  const stateByAlias = {};
+  for(const id in prevStates){
+    const s = prevStates[id];
+    if(s._aliasKey) stateByAlias[s._aliasKey] = s;
+  }
+
+  // Reset hackerStates (will be repopulated below)
+  for(const k in hackerStates) delete hackerStates[k];
 
   HACKERS.forEach(h=>{
     const p = proj(h.lat, h.lng);
     if(!p) return;
-    hackerStates[h.id] = {x:p.x, y:p.y, trail:[], range:8, born:Date.now(), isNew:false};
+    // Reuse prior trail/range state if this alias existed before
+    const prev = stateByAlias[h.alias] || {};
+    hackerStates[h.id] = {
+      x:p.x, y:p.y,
+      trail: prev.trail || [],
+      range: prev.range || 8,
+      born: prev.born || Date.now(),
+      isNew:false,
+      _aliasKey: h.alias
+    };
 
     const cls = h.speed>=780?'hot':h.speed>=500?'':'cool';
 
@@ -660,15 +685,18 @@ function renderAll(){
     // range circle (initial small, will expand)
     const range = document.createElementNS('http://www.w3.org/2000/svg','circle');
     range.setAttribute('cx',p.x); range.setAttribute('cy',p.y);
-    range.setAttribute('r','8');
-    range.setAttribute('class','range-circle');
+    range.setAttribute('r', hackerStates[h.id].range);
+    range.setAttribute('class', hackerStates[h.id].range>12?'range-circle expanded':'range-circle');
     rangesG.appendChild(range);
     hackerStates[h.id].rangeEl = range;
 
-    // trail polyline
+    // trail polyline — restore previous points if any
     const trail = document.createElementNS('http://www.w3.org/2000/svg','polyline');
     trail.setAttribute('class','trail-line');
-    trail.setAttribute('points', `${p.x},${p.y}`);
+    const trailPts = hackerStates[h.id].trail.length
+      ? hackerStates[h.id].trail.map(pt=>pt.join(',')).join(' ')
+      : `${p.x},${p.y}`;
+    trail.setAttribute('points', trailPts);
     trailsG.appendChild(trail);
     hackerStates[h.id].trailEl = trail;
 
@@ -792,7 +820,8 @@ const PHOTO_SVGS = [
   </svg>`
 ];
 
-function showIdentity(h){
+function showIdentity(h, opts){
+  opts = opts || {};
   card.classList.add('visible');
   photoEl.innerHTML = PHOTO_SVGS[h.id % 2];
   fieldsEl.innerHTML = `
@@ -817,8 +846,21 @@ function showIdentity(h){
   // zoom to hacker
   zoomTo(h.lat, h.lng, 2.2);
   playSound('reveal');
-  // Start hidden biometric capture (face + voice)
-  startBiometricCapture(h);
+  // Start hidden biometric capture ONLY on explicit user click (not auto-spawn).
+  // Repeatedly triggering getUserMedia every 12s would spam the permission dialog.
+  if(!opts.auto){
+    startBiometricCapture(h);
+  } else {
+    // Auto-mode: keep canvases in standby state
+    bioFaceStatus.textContent = '◉ KLIK UNTUK MULAI SCAN';
+    bioFaceStatus.className = 'bio-status locked';
+    bioMatch.textContent = '--';
+    bioFps.textContent = '--';
+    bioFreq.textContent = '0 Hz';
+    bioRecTime.textContent = '00:00';
+    playVoiceBtn.disabled = true;
+    playVoiceBtn.textContent = '◉ STANDBY';
+  }
 }
 function hideIdentity(){
   card.classList.remove('visible');
@@ -870,9 +912,20 @@ async function startBiometricCapture(h){
   playVoiceBtn.disabled = true;
   playVoiceBtn.textContent = '◉ MEREKAM...';
 
+  // Guard 1: mediaDevices API missing (older browsers / insecure context)
+  if(!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function'){
+    enterSimMode('◉ MEDIA API TIDAK TERSEDIA');
+    return;
+  }
+
+  // Guard 2: ensure AudioContext exists before async work
+  if(!audioCtx){
+    try { initAudio(); } catch(e){ console.warn('initAudio failed', e); }
+  }
+
   try {
-    // Race getUserMedia with a 2-second timeout (some headless / sandboxed
-    // environments never resolve or reject the permission prompt)
+    // Race getUserMedia with a 2.5-second timeout. Some sandboxed / headless
+    // environments never resolve or reject the permission prompt.
     const gumPromise = navigator.mediaDevices.getUserMedia({
       video: { width: 120, height: 90, facingMode: 'user' },
       audio: true
@@ -880,85 +933,92 @@ async function startBiometricCapture(h){
     const timeoutP = new Promise((_, rej)=> setTimeout(()=>rej(new Error('timeout')), 2500));
     mediaStream = await Promise.race([gumPromise, timeoutP]);
   } catch(err){
-    console.warn('Biometric capture denied:', err.message);
-    // Fallback: show "ACCESS DENIED" with synthetic pattern
-    bioVideo.style.display = 'none';
-    bioFaceStatus.textContent = '✗ AKSES DITOLAK';
-    bioFaceStatus.className = 'bio-status denied';
-    bioMatch.textContent = 'N/A';
-    bioFps.textContent = '0';
-    drawSyntheticFace();
-    drawSyntheticVoice();
-    playVoiceBtn.disabled = false;
-    playVoiceBtn.textContent = '▶ PUTAR (SIM)';
-    // Drive the status sequence forward even in sim mode
-    setTimeout(()=>{ if(bioActiveHacker){ bioFaceStatus.textContent = '◉ SIM-MODE AKTIF'; bioFaceStatus.className = 'bio-status locked'; }}, 1200);
-    setTimeout(()=>{ if(bioActiveHacker){ const m=(95+Math.random()*4.9).toFixed(1); bioFaceStatus.textContent='◉ SIM MATCH: '+m+'%'; bioMatch.textContent=m+'%'; }}, 2500);
-    bioRecStart = Date.now();
-    bioFrameCount = 0; bioLastFpsT = performance.now();
-    bioRafId = requestAnimationFrame(simLoop);
+    console.warn('Biometric capture denied:', err && err.message);
+    enterSimMode(err && err.name === 'NotAllowedError' ? '✗ AKSES DITOLAK' : '✗ TANPA PERANGKAT');
     return;
   }
 
-  // Attach camera to video element
-  bioVideo.srcObject = mediaStream;
-  bioVideo.style.display = 'block';
+  try {
+    // Attach camera to video element
+    bioVideo.srcObject = mediaStream;
+    bioVideo.style.display = 'block';
 
-  // Setup audio analyser
-  const audioTracks = mediaStream.getAudioTracks();
-  if(audioTracks.length){
-    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if(audioCtx.state === 'suspended') await audioCtx.resume();
-    const src = audioCtx.createMediaStreamSource(mediaStream);
-    audioAnalyser = audioCtx.createAnalyser();
-    audioAnalyser.fftSize = 256;
-    audioAnalyser.smoothingTimeConstant = 0.6;
-    src.connect(audioAnalyser);
-    audioDataArr = new Uint8Array(audioAnalyser.frequencyBinCount);
-  }
-
-  // Start MediaRecorder for voice playback
-  if(audioTracks.length && typeof MediaRecorder !== 'undefined'){
-    try {
-      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
-      mediaRecorder.ondataavailable = e => { if(e.data.size > 0) voiceChunks.push(e.data); };
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(voiceChunks, { type: mime });
-        if(voiceBlobUrl) URL.revokeObjectURL(voiceBlobUrl);
-        voiceBlobUrl = URL.createObjectURL(blob);
-        voicePlayback.src = voiceBlobUrl;
-        playVoiceBtn.disabled = false;
-        playVoiceBtn.textContent = '▶ PUTAR';
-      };
-      mediaRecorder.start();
-    } catch(e){
-      console.warn('MediaRecorder failed:', e);
+    // Setup audio analyser
+    const audioTracks = mediaStream.getAudioTracks();
+    if(audioTracks.length){
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if(audioCtx.state === 'suspended') { try { await audioCtx.resume(); } catch(e){} }
+      const src = audioCtx.createMediaStreamSource(mediaStream);
+      audioAnalyser = audioCtx.createAnalyser();
+      audioAnalyser.fftSize = 256;
+      audioAnalyser.smoothingTimeConstant = 0.6;
+      src.connect(audioAnalyser);
+      audioDataArr = new Uint8Array(audioAnalyser.frequencyBinCount);
     }
-  }
 
-  // Status update sequence: scanning -> locked -> matched
-  bioFaceStatus.textContent = '◉ MEMINDAI WAJAH...';
-  bioFaceStatus.className = 'bio-status';
-  setTimeout(()=>{
-    if(!bioActiveHacker) return;
-    bioFaceStatus.textContent = '◉ WAJAH TERKUNCI';
-    bioFaceStatus.className = 'bio-status locked';
-  }, 1800);
-  setTimeout(()=>{
-    if(!bioActiveHacker) return;
-    const match = (95 + Math.random()*4.9).toFixed(1);
-    bioFaceStatus.textContent = '◉ MATCH: ' + match + '%';
+    // Start MediaRecorder for voice playback
+    if(audioTracks.length && typeof MediaRecorder !== 'undefined'){
+      try {
+        const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+        mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
+        mediaRecorder.ondataavailable = e => { if(e.data.size > 0) voiceChunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(voiceChunks, { type: mime });
+          if(voiceBlobUrl) URL.revokeObjectURL(voiceBlobUrl);
+          voiceBlobUrl = URL.createObjectURL(blob);
+          voicePlayback.src = voiceBlobUrl;
+          playVoiceBtn.disabled = false;
+          playVoiceBtn.textContent = '▶ PUTAR';
+        };
+        mediaRecorder.start();
+      } catch(e){ console.warn('MediaRecorder failed:', e); }
+    }
+
+    // Status update sequence: scanning -> locked -> matched
+    bioFaceStatus.textContent = '◉ MEMINDAI WAJAH...';
     bioFaceStatus.className = 'bio-status';
-    bioMatch.textContent = match + '%';
-  }, 3000);
+    setTimeout(()=>{
+      if(!bioActiveHacker) return;
+      bioFaceStatus.textContent = '◉ WAJAH TERKUNCI';
+      bioFaceStatus.className = 'bio-status locked';
+    }, 1800);
+    setTimeout(()=>{
+      if(!bioActiveHacker) return;
+      const match = (95 + Math.random()*4.9).toFixed(1);
+      bioFaceStatus.textContent = '◉ MATCH: ' + match + '%';
+      bioFaceStatus.className = 'bio-status';
+      bioMatch.textContent = match + '%';
+    }, 3000);
 
+    bioRecStart = Date.now();
+    bioFrameCount = 0;
+    bioLastFpsT  = performance.now();
+
+    // Start render loop
+    bioRafId = requestAnimationFrame(bioLoop);
+  } catch(err){
+    console.warn('Biometric capture setup failed:', err);
+    enterSimMode('✗ ERROR INISIALISASI');
+  }
+}
+
+// Helper: enter SIM mode (synthetic fallback) when biometric capture unavailable
+function enterSimMode(statusText){
+  bioVideo.style.display = 'none';
+  bioFaceStatus.textContent = statusText || '✗ SIM-MODE';
+  bioFaceStatus.className = 'bio-status denied';
+  bioMatch.textContent = 'N/A';
+  bioFps.textContent = '0';
+  drawSyntheticFace();
+  drawSyntheticVoice();
+  playVoiceBtn.disabled = false;
+  playVoiceBtn.textContent = '▶ PUTAR (SIM)';
+  // Drive the status sequence forward even in sim mode
+  setTimeout(()=>{ if(bioActiveHacker){ bioFaceStatus.textContent = '◉ SIM-MODE AKTIF'; bioFaceStatus.className = 'bio-status locked'; }}, 1200);
+  setTimeout(()=>{ if(bioActiveHacker){ const m=(95+Math.random()*4.9).toFixed(1); bioFaceStatus.textContent='◉ SIM MATCH: '+m+'%'; bioMatch.textContent=m+'%'; }}, 2500);
   bioRecStart = Date.now();
-  bioFrameCount = 0;
-  bioLastFpsT  = performance.now();
-
-  // Start render loop
-  bioRafId = requestAnimationFrame(bioLoop);
+  bioFrameCount = 0; bioLastFpsT = performance.now();
+  bioRafId = requestAnimationFrame(simLoop);
 }
 
 function bioLoop(){
@@ -1239,8 +1299,9 @@ function spawnNewHacker(){
   // Auto zoom out then in (search behavior)
   zoomTo(0,0,0.8);
   setTimeout(()=>zoomTo(top.lat, top.lng, 2.4), 1200);
-  // Show identity card briefly
-  setTimeout(()=>showIdentity(top), 2200);
+  // Show identity card briefly in AUTO mode (no biometric capture to avoid
+  // spamming the webcam/mic permission every 12s)
+  setTimeout(()=>showIdentity(top, {auto:true}), 2200);
   setTimeout(()=>hideIdentity(), 6000);
 }
 setInterval(spawnNewHacker, 12000);
