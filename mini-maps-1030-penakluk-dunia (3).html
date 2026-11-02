@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MINI MAPS // 1031 — REALITA PENAKLUK DUNIA</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<style>
+  :root{
+    --bg:#040814; --bg-2:#0a1430;
+    --neon:#00e5ff; --neon-2:#00ffa3; --neon-3:#ff00d4;
+    --warn:#ffb000; --grid:rgba(0,229,255,.08); --line:rgba(0,229,255,.25);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(ellipse at top, #0a1a3a 0%, var(--bg) 60%, #000 100%);
+    color:#c8f3ff; font-family:'Rajdhani',sans-serif; overflow-x:hidden; min-height:100vh;
+  }
+  body::before{
+    content:""; position:fixed;inset:0;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:48px 48px; pointer-events:none; z-index:0;
+    animation:gridShift 20s linear infinite;
+  }
+  body::after{
+    content:""; position:fixed;inset:0;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.25) 2px 4px);
+    pointer-events:none; z-index:1000; mix-blend-mode:overlay; opacity:.35;
+  }
+  @keyframes gridShift{from{background-position:0 0,0 0}to{background-position:48px 48px,48px 48px}}
+
+  /* ---------- HEADER ---------- */
+  header{
+    position:relative;z-index:5; padding:14px 28px;
+    border-bottom:1px solid var(--line);
+    background:linear-gradient(90deg, rgba(0,229,255,.06), rgba(255,0,212,.04));
+    display:flex;align-items:center;justify-content:space-between;
+    backdrop-filter:blur(4px);
+  }
+  .logo{
+    font-family:'Orbitron';font-weight:900; font-size:22px;
+    letter-spacing:3px; color:var(--neon);
+    text-shadow:0 0 8px var(--neon),0 0 18px rgba(0,229,255,.5);
+    display:flex;align-items:center;gap:12px;
+  }
+  .logo .dot{
+    width:14px;height:14px;border-radius:50%;
+    background:var(--neon-2); box-shadow:0 0 12px var(--neon-2);
+    animation:pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
+  .logo span.sub{color:var(--neon-3);font-size:14px;text-shadow:0 0 8px var(--neon-3)}
+  .top-status{
+    display:flex;gap:18px; flex-wrap:wrap;
+    font-family:'Share Tech Mono'; font-size:12px; color:#7ec7d8;
+    text-transform:uppercase;letter-spacing:1.2px;
+  }
+  .top-status b{color:var(--neon-2);text-shadow:0 0 6px var(--neon-2)}
+  .top-status .danger{color:var(--neon-3);text-shadow:0 0 6px var(--neon-3)}
+  .audio-toggle{
+    cursor:pointer; padding:5px 10px;
+    border:1px solid var(--neon); border-radius:3px;
+    background:rgba(0,229,255,.08); color:var(--neon);
+    font-family:'Share Tech Mono'; font-size:11px; letter-spacing:1px;
+    transition:all .2s;
+  }
+  .audio-toggle:hover{background:rgba(0,229,255,.2)}
+  .audio-toggle.muted{opacity:.4; border-color:#5a7c8c; color:#5a7c8c}
+
+  /* ---------- LAYOUT ---------- */
+  main{position:relative;z-index:2; padding:18px 28px 22px; display:grid; grid-template-columns:1.65fr 1fr; gap:18px}
+  @media (max-width:1100px){main{grid-template-columns:1fr}}
+
+  .panel{
+    position:relative;
+    background:linear-gradient(160deg, rgba(10,20,48,.85), rgba(4,8,20,.9));
+    border:1px solid var(--line); border-radius:6px; padding:16px;
+    box-shadow:0 0 24px rgba(0,229,255,.08) inset, 0 0 30px rgba(0,0,0,.4);
+  }
+  .panel::before, .panel::after{
+    content:"";position:absolute;width:18px;height:18px;border:2px solid var(--neon);
+  }
+  .panel::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+  .panel::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+  .panel h2{
+    font-family:'Orbitron';font-weight:700; font-size:13px; letter-spacing:3px;
+    color:var(--neon); margin-bottom:12px;
+    display:flex;align-items:center;gap:10px; text-transform:uppercase;
+  }
+  .panel h2::before{content:"▌";color:var(--neon-3)}
+  .panel h2 .id{margin-left:auto;font-family:'Share Tech Mono';color:#5a7c8c;font-size:11px;letter-spacing:1px}
+
+  /* ---------- WORLD MAP ---------- */
+  .map-wrap{position:relative;width:100%;aspect-ratio:2/1.05;overflow:hidden;border-radius:4px;background:#020611}
+  #world-svg{width:100%;height:100%;display:block;transition:transform .9s cubic-bezier(.25,.8,.3,1)}
+  .map-wrap .hex{fill:none;stroke:rgba(0,229,255,.10);stroke-width:.5}
+  .map-wrap .land{
+    fill:rgba(0,229,255,.04); stroke:var(--neon); stroke-width:.5;
+    stroke-linejoin:round; filter:drop-shadow(0 0 2px rgba(0,229,255,.55));
+    transition:fill .3s;
+  }
+  .map-wrap .land:hover{fill:rgba(255,0,212,.18);cursor:crosshair}
+  .map-wrap .graticule{fill:none;stroke:rgba(0,229,255,.07);stroke-width:.4;stroke-dasharray:2 3}
+  .map-wrap .sphere{fill:rgba(0,8,25,.65);stroke:rgba(0,229,255,.35);stroke-width:.6}
+
+  .range-circle{fill:none;stroke:rgba(0,229,255,.45);stroke-width:.6;stroke-dasharray:2 3}
+  .range-circle.expanded{stroke:rgba(255,0,212,.45)}
+  .trail-line{fill:none;stroke:rgba(255,176,0,.55);stroke-width:.5;stroke-dasharray:1 2;opacity:.6}
+  .attack-line{stroke:var(--neon-3);stroke-width:.8;fill:none;stroke-dasharray:4 3;filter:drop-shadow(0 0 2px var(--neon-3));opacity:.85}
+  .attack-line.fast{stroke:var(--warn)}
+  .node-dot{fill:var(--neon);filter:drop-shadow(0 0 4px var(--neon));cursor:pointer}
+  .node-dot.hot{fill:var(--neon-3);filter:drop-shadow(0 0 6px var(--neon-3))}
+  .node-dot.cool{fill:var(--neon-2);filter:drop-shadow(0 0 6px var(--neon-2))}
+  .node-dot.warn{fill:var(--warn);filter:drop-shadow(0 0 6px var(--warn))}
+  .node-dot.new{animation:nodeSpawn 1.2s ease-out}
+  @keyframes nodeSpawn{
+    0%{transform:scale(0)}
+    60%{transform:scale(2.5)}
+    100%{transform:scale(1)}
+  }
+  .scan{
+    position:absolute;left:0;right:0;height:60px;
+    background:linear-gradient(180deg, rgba(0,229,255,0), rgba(0,229,255,.18), rgba(0,229,255,0));
+    pointer-events:none; animation:scanMove 6s linear infinite;
+  }
+  @keyframes scanMove{0%{top:-60px}100%{top:100%}}
+  .hud{position:absolute;font-family:'Share Tech Mono';font-size:10px;letter-spacing:1px;color:var(--neon);opacity:.85;pointer-events:none}
+  .hud.tl{top:8px;left:10px}
+  .hud.tr{top:8px;right:10px;text-align:right}
+  .hud.bl{bottom:8px;left:10px}
+  .hud.br{bottom:8px;right:10px;text-align:right}
+  .hud b{color:var(--neon-2);text-shadow:0 0 5px var(--neon-2)}
+
+  /* ---------- IDENTITY CARD (KTP-1031) ---------- */
+  #id-card{
+    position:fixed; top:50%; right:24px; transform:translateY(-50%) translateX(120%);
+    width:340px; z-index:50;
+    background:linear-gradient(160deg, #08152a 0%, #0a1a35 60%, #050a18 100%);
+    border:1px solid var(--neon);
+    border-radius:6px; padding:0; overflow:hidden;
+    box-shadow:0 0 30px rgba(0,229,255,.4), 0 0 60px rgba(255,0,212,.2);
+    transition:transform .55s cubic-bezier(.2,.8,.3,1);
+    font-family:'Rajdhani';
+  }
+  #id-card.visible{transform:translateY(-50%) translateX(0)}
+  #id-card::before{
+    content:""; position:absolute;inset:0;
+    background:repeating-linear-gradient(45deg, rgba(0,229,255,.04) 0 8px, rgba(0,0,0,0) 8px 16px);
+    pointer-events:none;
+  }
+  .id-head{
+    background:linear-gradient(90deg, rgba(0,229,255,.18), rgba(255,0,212,.12));
+    padding:10px 14px; border-bottom:1px solid var(--neon);
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .id-head .title{font-family:'Orbitron';font-weight:800;font-size:11px;letter-spacing:2px;color:var(--neon)}
+  .id-head .id-sub{font-family:'Share Tech Mono';font-size:9px;color:var(--neon-3);text-align:right;line-height:1.3}
+  .id-body{padding:12px 14px; display:grid; grid-template-columns:90px 1fr; gap:12px}
+  .id-photo{
+    width:90px;height:115px;
+    background:linear-gradient(160deg, #0a1838, #050a18);
+    border:1px solid var(--neon);
+    display:flex;align-items:center;justify-content:center;
+    position:relative; overflow:hidden;
+  }
+  .id-photo svg{width:80%;height:80%}
+  .id-photo::after{
+    content:""; position:absolute;inset:0;
+    background:repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,229,255,.1) 3px 4px);
+  }
+  .id-fields{display:grid; grid-template-columns:auto 1fr; gap:3px 8px; font-size:11.5px; line-height:1.35}
+  .id-fields .lbl{color:#7ec7d8;font-family:'Share Tech Mono';font-size:9.5px;letter-spacing:.5px;text-transform:uppercase}
+  .id-fields .val{color:#e8f9ff;font-weight:600}
+  .id-fields .val.alias{color:var(--neon-3);font-family:'Share Tech Mono';font-size:13px;text-shadow:0 0 5px var(--neon-3)}
+  .id-fields .val.danger{color:var(--warn);text-shadow:0 0 4px var(--warn)}
+  .id-foot{
+    border-top:1px solid var(--neon);
+    padding:8px 14px;
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'Share Tech Mono';font-size:9px;color:#5a7c8c;letter-spacing:1px;
+  }
+  .id-foot .sig{
+    color:var(--neon-2); font-family:'Rajdhani';font-style:italic;font-size:14px;
+    border-bottom:1px dashed var(--neon-2); padding:0 8px 1px;
+    text-shadow:0 0 5px var(--neon-2);
+  }
+  .id-close{
+    cursor:pointer; color:var(--neon-3);
+    background:none;border:none;font-size:16px;font-weight:bold;
+    font-family:'Orbitron';
+  }
+  .id-close:hover{color:#fff}
+
+  /* ---------- BIOMETRIC SECTIONS (hidden face + voice capture) ---------- */
+  .id-bio{
+    border-top:1px solid var(--line);
+    padding:8px 14px;
+    background:linear-gradient(90deg, rgba(255,0,212,.05), rgba(0,229,255,.03));
+    position:relative;
+  }
+  .id-bio + .id-bio{border-top:1px solid var(--line)}
+  .bio-label{
+    font-family:'Share Tech Mono'; font-size:9px; letter-spacing:1.2px;
+    color:var(--neon-3); text-transform:uppercase; margin-bottom:6px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .rec-dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--neon-3); box-shadow:0 0 6px var(--neon-3);
+    animation:rec 1s ease-in-out infinite;
+  }
+  .rec-dot.amber{background:var(--warn); box-shadow:0 0 6px var(--warn)}
+  @keyframes rec{0%,100%{opacity:1}50%{opacity:.2}}
+  .bio-face{
+    position:relative; width:100%; height:90px;
+    background:#020611; border:1px solid var(--neon); overflow:hidden;
+    border-radius:3px;
+  }
+  .bio-face video{
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; opacity:.85;
+    filter:hue-rotate(180deg) saturate(1.6) brightness(.85) contrast(1.2);
+    transform:scaleX(-1);
+  }
+  .bio-face canvas{
+    position:absolute; inset:0; width:100%; height:100%;
+    pointer-events:none;
+  }
+  .bio-overlay{
+    position:absolute; inset:0; pointer-events:none;
+  }
+  .face-frame{
+    position:absolute; top:18px; left:50%; transform:translateX(-50%);
+    width:56px; height:70px; border:1.5px solid var(--neon-2);
+    border-radius:50% 50% 45% 45% / 60% 60% 40% 40%;
+    box-shadow:0 0 10px var(--neon-2), inset 0 0 8px rgba(0,255,163,.3);
+  }
+  .face-frame::before, .face-frame::after{
+    content:""; position:absolute; width:8px; height:8px;
+    border:1.5px solid var(--neon-2);
+  }
+  .face-frame::before{top:-2px; left:-2px; border-right:none; border-bottom:none}
+  .face-frame::after{bottom:-2px; right:-2px; border-left:none; border-top:none}
+  .bio-status{
+    position:absolute; bottom:5px; left:6px;
+    font-family:'Share Tech Mono'; font-size:9px; color:var(--neon-2);
+    text-shadow:0 0 4px var(--neon-2); letter-spacing:1px;
+  }
+  .bio-status.locked{color:var(--neon-3); text-shadow:0 0 4px var(--neon-3)}
+  .bio-status.denied{color:#ff5555}
+  .bio-meta{
+    display:flex; justify-content:space-between; gap:6px;
+    font-family:'Share Tech Mono'; font-size:9.5px; color:#7ec7d8;
+    margin-top:5px; letter-spacing:.5px;
+  }
+  .bio-meta b{color:var(--neon-2); text-shadow:0 0 4px var(--neon-2)}
+  .bio-voice{
+    position:relative; width:100%; height:38px;
+    background:#020611; border:1px solid var(--neon); overflow:hidden;
+    border-radius:3px;
+  }
+  .bio-voice canvas{display:block; width:100%; height:100%}
+  .play-btn{
+    cursor:pointer; padding:2px 8px;
+    background:rgba(0,229,255,.1); border:1px solid var(--neon);
+    color:var(--neon); font-family:'Share Tech Mono'; font-size:9px;
+    border-radius:2px; letter-spacing:1px; transition:all .2s;
+  }
+  .play-btn:hover{background:var(--neon); color:#040814}
+  .play-btn:disabled{opacity:.4; cursor:not-allowed}
+
+  /* ---------- STATS ---------- */
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .stat{
+    background:rgba(0,229,255,.05); border:1px solid var(--line);
+    padding:8px 10px; border-radius:4px; position:relative;overflow:hidden;
+  }
+  .stat .label{font-family:'Share Tech Mono';font-size:9.5px;color:#7ec7d8;letter-spacing:1.2px;text-transform:uppercase}
+  .stat .val{font-family:'Orbitron';font-weight:800;font-size:20px;color:var(--neon);text-shadow:0 0 8px var(--neon);margin-top:2px}
+  .stat .val.warn{color:var(--warn);text-shadow:0 0 8px var(--warn)}
+  .stat .val.danger{color:var(--neon-3);text-shadow:0 0 8px var(--neon-3)}
+  .stat .val small{font-size:10px;color:#5a7c8c;font-weight:400;margin-left:3px}
+  .stat::after{content:"";position:absolute;right:-10px;bottom:-10px;width:40px;height:40px;background:radial-gradient(circle, rgba(0,229,255,.25), transparent 70%)}
+
+  /* ---------- LEADERBOARD ---------- */
+  .hackers{display:flex;flex-direction:column;gap:6px;max-height:380px;overflow-y:auto;padding-right:4px}
+  .hackers::-webkit-scrollbar{width:5px}
+  .hackers::-webkit-scrollbar-thumb{background:var(--neon);border-radius:3px}
+  .hackers::-webkit-scrollbar-track{background:rgba(0,229,255,.05)}
+  .h-row{
+    display:grid;grid-template-columns:24px 1fr auto auto;gap:8px;align-items:center;
+    padding:6px 9px;background:rgba(0,229,255,.04);
+    border-left:3px solid var(--neon); border-radius:3px;
+    transition:all .25s; cursor:pointer;
+  }
+  .h-row:hover{background:rgba(255,0,212,.08);border-left-color:var(--neon-3);transform:translateX(3px)}
+  .h-row.active{background:rgba(255,0,212,.15);border-left-color:var(--warn);box-shadow:0 0 12px rgba(255,176,0,.3)}
+  .h-row.new-row{animation:newRow 1.5s ease-out}
+  @keyframes newRow{0%{background:rgba(255,176,0,.4)}100%{background:rgba(0,229,255,.04)}}
+  .h-row .rank{font-family:'Orbitron';font-weight:800;color:var(--neon-2);text-align:center;font-size:13px}
+  .h-row .rank.top{color:var(--warn);text-shadow:0 0 6px var(--warn)}
+  .h-row .alias{font-weight:700;color:#e8f9ff;letter-spacing:.5px;font-size:13px}
+  .h-row .country{font-family:'Share Tech Mono';font-size:9.5px;color:#7ec7d8;display:block;margin-top:1px}
+  .h-row .speed{font-family:'Share Tech Mono';font-size:12px;color:var(--neon);text-align:right;min-width:74px}
+  .h-row .speed b{font-size:14px}
+  .h-row .data{font-family:'Share Tech Mono';font-size:10px;color:var(--neon-3);text-align:right;min-width:60px;text-shadow:0 0 4px var(--neon-3)}
+  .bar{height:3px;background:rgba(0,229,255,.1);border-radius:2px;overflow:hidden;margin-top:3px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg, var(--neon-2), var(--neon), var(--neon-3));box-shadow:0 0 6px var(--neon)}
+
+  /* ---------- FEED ---------- */
+  .feed{max-height:180px;overflow-y:auto;font-family:'Share Tech Mono';font-size:10.5px;line-height:1.6}
+  .feed::-webkit-scrollbar{width:5px}
+  .feed::-webkit-scrollbar-thumb{background:var(--neon-3);border-radius:3px}
+  .feed .row{display:flex;gap:7px;padding:2px 0;border-bottom:1px dashed rgba(0,229,255,.1)}
+  .feed .row.new-feed{animation:newRow 2s ease-out}
+  .feed .t{color:#5a7c8c;min-width:55px}
+  .feed .tag{padding:0 4px;border-radius:2px;font-size:8.5px;letter-spacing:1px;flex-shrink:0}
+  .feed .tag.intrusion{background:rgba(255,0,212,.2);color:var(--neon-3)}
+  .feed .tag.ddos{background:rgba(255,176,0,.2);color:var(--warn)}
+  .feed .tag.breach{background:rgba(0,255,163,.2);color:var(--neon-2)}
+  .feed .tag.zero{background:rgba(0,229,255,.2);color:var(--neon)}
+  .feed .msg{color:#bce6f0;flex:1}
+  .feed .msg b{color:#e8f9ff}
+
+  /* ---------- AUDIO BAR ---------- */
+  .audio-bar{
+    display:flex; gap:2px; height:14px; align-items:end; margin-top:6px;
+  }
+  .audio-bar > i{
+    flex:1; background:var(--neon); display:block;
+    animation:vu 0.5s ease-in-out infinite alternate;
+    box-shadow:0 0 4px var(--neon);
+  }
+  .audio-bar > i:nth-child(odd){animation-duration:.7s}
+  .audio-bar > i:nth-child(3n){animation-duration:.4s;background:var(--neon-3)}
+  @keyframes vu{0%{height:20%}100%{height:100%}}
+
+  /* ---------- FOOTER ---------- */
+  footer{
+    position:relative;z-index:5; text-align:center;padding:12px;
+    font-family:'Share Tech Mono';font-size:10px;color:#4a6b7c;letter-spacing:2px;
+    border-top:1px solid var(--line);
+  }
+  footer b{color:var(--neon);text-shadow:0 0 5px var(--neon)}
+
+  #tip{
+    position:fixed;pointer-events:none;
+    background:rgba(4,8,20,.95); border:1px solid var(--neon);
+    padding:6px 8px;border-radius:3px;
+    font-family:'Share Tech Mono';font-size:11px;color:var(--neon);
+    box-shadow:0 0 12px rgba(0,229,255,.5); opacity:0; transition:opacity .15s;
+    z-index:100; max-width:220px;
+  }
+  #tip b{color:var(--neon-3);display:block;font-size:12px;margin-bottom:2px}
+  #tip small{color:#7ec7d8;display:block;margin-top:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="dot"></span>
+    MINI MAPS <span class="sub">// 1031 REALITA PENAKLUK DUNIA</span>
+  </div>
+  <div class="top-status">
+    <div>SYS: <b>ONLINE</b></div>
+    <div>UPLINK: <b>9.8 Gb/s</b></div>
+    <div>NODES: <b id="stat-nodes">50</b></div>
+    <div>STATUS: <span class="danger">DEFCON 2</span></div>
+    <div id="clock">--:--:--</div>
+    <button class="audio-toggle" id="audioBtn">♪ AUDIO ON</button>
+  </div>
+</header>
+
+<main>
+  <!-- ============ MAP ============ -->
+  <section class="panel">
+    <h2>
+      Global Attack Surface — Realita Penakluk
+      <span class="id">SAT-FEED // LIVE</span>
+    </h2>
+    <div class="map-wrap" id="map">
+      <div class="scan"></div>
+      <div class="hud tl">LAT <span id="hud-lat">00°00'00"N</span><br>LNG <span id="hud-lng">00°00'00"E</span></div>
+      <div class="hud tr">ZOOM <b id="hud-zoom">x1.00</b><br>LAYER: NEON-HAX</div>
+      <div class="hud bl">SIGNAL <b>98.4%</b><br>ENCRYPT AES-512</div>
+      <div class="hud br">FRAME <b id="frame">000000</b><br>FPS 60</div>
+
+      <svg id="world-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <pattern id="hexpat" width="30" height="26" patternUnits="userSpaceOnUse">
+            <polygon class="hex" points="15,0 30,7 30,19 15,26 0,19 0,7"/>
+          </pattern>
+          <radialGradient id="hotspot" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ff00d4" stop-opacity=".7"/>
+            <stop offset="100%" stop-color="#ff00d4" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="hotspot-amber" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffb000" stop-opacity=".7"/>
+            <stop offset="100%" stop-color="#ffb000" stop-opacity="0"/>
+          </radialGradient>
+          <radialGradient id="ocean" cx="50%" cy="40%" r="70%">
+            <stop offset="0%" stop-color="#0a1838"/>
+            <stop offset="100%" stop-color="#020611"/>
+          </radialGradient>
+        </defs>
+        <rect width="1000" height="500" fill="url(#ocean)"/>
+        <rect width="1000" height="500" fill="url(#hexpat)"/>
+        <g id="world-graticule"></g>
+        <path id="world-sphere" class="sphere" d=""/>
+        <g id="world-land"></g>
+        <g id="trails"></g>
+        <g id="ranges"></g>
+        <g id="arcs"></g>
+        <g id="hots"></g>
+        <g id="nodes"></g>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ============ SIDE ============ -->
+  <aside style="display:flex;flex-direction:column;gap:18px">
+    <div class="panel">
+      <h2>Realtime Statistics <span class="id">CORE-AI</span></h2>
+      <div class="stat-grid">
+        <div class="stat"><div class="label">Max Hack Speed</div><div class="val" id="s-speed">847 <small>Tb/s</small></div></div>
+        <div class="stat"><div class="label">Data Dikonsumsi</div><div class="val warn" id="s-data">2.41 <small>PB/hari</small></div></div>
+        <div class="stat"><div class="label">Sistem Diretas</div><div class="val danger" id="s-sys">18,934</div></div>
+        <div class="stat"><div class="label">Negara Teramati</div><div class="val" id="s-neg">194</div></div>
+        <div class="stat"><div class="label">Penakluk Aktif</div><div class="val" id="s-act">50</div></div>
+        <div class="stat"><div class="label">Reality Breach</div><div class="val danger" id="s-br">42</div></div>
+      </div>
+      <div class="audio-bar" id="audioBar"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Top Penakluk <span class="id">GLOBAL RANK // LIVE</span></h2>
+      <div class="hackers" id="hackers"></div>
+    </div>
+  </aside>
+</main>
+
+<section class="panel" style="margin:0 28px 22px">
+  <h2>Live Attack Feed — Audio Stream <span class="id">REC ●</span></h2>
+  <div class="feed" id="feed"></div>
+</section>
+
+<footer>
+  MINI MAPS v1031 // REALITA PENAKLUK DUNIA &copy; 2026 // PEMANTAU SISTEM GLOBAL //
+  <b>DEFCON 2</b> // AES-512 // AUDIO: AKTIF
+</footer>
+
+<!-- Identity card (mirip KTP) -->
+<div id="id-card">
+  <div class="id-head">
+    <div class="title">KARTU IDENTITAS DIGITAL // GLOBAL HACK ID</div>
+    <button class="id-close" id="idClose">✕</button>
+  </div>
+  <div class="id-body">
+    <div class="id-photo" id="idPhoto"></div>
+    <div class="id-fields" id="idFields"></div>
+  </div>
+
+  <!-- HIDDEN FACE CAPTURE (biometric) -->
+  <div class="id-bio">
+    <div class="bio-label">
+      <span class="rec-dot"></span> REKAMAN WAJAH — TERSEMBUNYI
+    </div>
+    <div class="bio-face">
+      <video id="bioVideo" autoplay muted playsinline></video>
+      <canvas id="bioCanvas" width="120" height="90"></canvas>
+      <div class="bio-overlay">
+        <div class="face-frame"></div>
+        <div class="bio-status" id="bioFaceStatus">◉ MEMINDAI...</div>
+      </div>
+    </div>
+    <div class="bio-meta">
+      <span>FPS: <b id="bioFps">--</b></span>
+      <span>MATCH: <b id="bioMatch" style="color:var(--neon-3)">98.7%</b></span>
+      <span>ENC: AES-512</span>
+    </div>
+  </div>
+
+  <!-- HIDDEN VOICE CAPTURE -->
+  <div class="id-bio">
+    <div class="bio-label">
+      <span class="rec-dot amber"></span> REKAMAN SUARA — TERSEMBUNYI
+    </div>
+    <div class="bio-voice">
+      <canvas id="voiceWave" width="312" height="38"></canvas>
+    </div>
+    <div class="bio-meta">
+      <span>FREQ: <b id="bioFreq">0 Hz</b></span>
+      <span>REC: <b id="bioRecTime">00:00</b></span>
+      <button id="playVoiceBtn" class="play-btn">▶ PUTAR</button>
+    </div>
+    <audio id="voicePlayback" controls style="display:none"></audio>
+  </div>
+
+  <div class="id-foot">
+    <div>SIGNED BY<br><span class="sig">PENAKLUK-OS</span></div>
+    <div style="text-align:right">VALID THRU<br><b id="idValid" style="color:var(--neon)">XX-XX-XXXX</b></div>
+  </div>
+</div>
+
+<div id="tip"></div>
+
+<script>
+/* ============================================================
+   DATA — Hacker pantheon (50 penakluk, fictional / illustrative)
+   ============================================================ */
+const FIRST = ["GH0ST","N1GHT","VEX","Z3R0","PHANTOM","BYTE","C1PHER","NEON","DARK","V01D",
+               "CRIMSON","SHADOW","GLITCH","0BLIVION","TITANIUM","APEX","NEXUS","ABYSS",
+               "ECLIPSE","SILENT","CIPHER","STATIC","VOID","RAVEN","EMBER","QUANTUM",
+               "OBSIDIAN","NEBULA","PRISM","SPECTER","PIXEL","FROST","HEX","SILVER","MIDNIGHT"];
+const SECOND = ["FURY","W1RE","NULL","DAY_K1NG","R4VEN","REAPER","L0RD","SERPENT","QUANTUM","WALKER",
+                "ECHO","MIRAGE","PROPHET","X","FOX","PHANTOM","BREAKER","RUNNER","DROID","VORTEX",
+                "NOMAD","OMEN","HUNTER","PROTOCOL","GHOST","MIRAGE","FLUX","HACK","REAVER","AI"];
+const TARGETS = ["Power Grid EU","Banking Core US","Pentagon Mesh","SWIFT Network","Crypto Exchange",
+                 "Telecom DE","Defense AI","Auto Plant Toyota","NHS Database","Oil SCADA",
+                 "ISRO Sat","TGV Rail","EUR-Lex","Power Grid RU","Samsung R&D","Pipeline CA",
+                 "NBN Backbone","Ericsson Core","Banking TR","Rail PL","Mining ZA","PEMEX Grid",
+                 "Telkomsel","Banking TH","VNPT Mesh","MAS Core","Petronas SCADA","BSP Bank",
+                 "Suez Canal","YPF Grid","NASA JPL","ESA Rosetta","CERN Collider","Bank Indonesia",
+                 "Stock Exchange","Vaccine Lab","Drone Fleet","Power Plant","Submarine Cable"];
+const COUNTRIES = [
+  ["RU","Moscow",        55.75,37.62],  ["CN","Shanghai",      31.23,121.47],
+  ["US","Silicon Valley",37.40,-122.08],["KP","Pyongyang",     39.02,125.75],
+  ["BR","São Paulo",    -23.55,-46.63], ["DE","Berlin",        52.52,13.40],
+  ["IL","Tel Aviv",      32.08,34.78],  ["JP","Tokyo",         35.68,139.69],
+  ["UK","London",        51.51,-0.13],  ["IR","Tehran",        35.69,51.39],
+  ["IN","Bengaluru",     12.97,77.59],  ["FR","Paris",         48.86,2.35],
+  ["NL","Amsterdam",     52.37,4.90],   ["UA","Kyiv",          50.45,30.52],
+  ["KR","Seoul",         37.57,126.98], ["CA","Toronto",       43.65,-79.38],
+  ["AU","Sydney",       -33.87,151.21], ["SE","Stockholm",     59.33,18.07],
+  ["TR","İstanbul",      41.01,28.98],  ["PL","Warsaw",        52.23,21.01],
+  ["ZA","Johannesburg",-26.20,28.04],   ["MX","Mexico City",   19.43,-99.13],
+  ["ID","Jakarta",      -6.21,106.85],  ["TH","Bangkok",       13.76,100.50],
+  ["VN","Hà Nội",        21.03,105.85], ["SG","Singapore",     1.35,103.82],
+  ["MY","Kuala Lumpur",  3.14,101.69],  ["PH","Manila",        14.60,120.98],
+  ["EG","Cairo",         30.04,31.24],  ["AR","Buenos Aires",-34.61,-58.38],
+  ["NG","Lagos",          6.52,3.37],   ["KE","Nairobi",      -1.29,36.82],
+  ["SA","Riyadh",        24.71,46.67],  ["AE","Dubai",         25.20,55.27],
+  ["PK","Karachi",       24.86,67.01],  ["BD","Dhaka",         23.81,90.41],
+  ["IT","Roma",          41.90,12.50],  ["ES","Madrid",        40.42,-3.70],
+  ["CH","Zürich",        47.37,8.55],   ["AT","Wien",          48.21,16.37],
+  ["NO","Oslo",          59.91,10.75],  ["FI","Helsinki",      60.17,24.94],
+  ["GR","Athens",        37.98,23.73],  ["PT","Lisbon",        38.72,-9.13],
+  ["CL","Santiago",     -33.45,-70.67], ["CO","Bogotá",         4.71,-74.07],
+  ["PE","Lima",         -12.05,-77.04], ["VE","Caracas",       10.49,-66.87],
+  ["NZ","Wellington",  -41.29,174.78],  ["HK","Hong Kong",    22.32,114.17]
+];
+
+const HACKERS = [];
+for(let i=0;i<50;i++){
+  const c = COUNTRIES[i % COUNTRIES.length];
+  const a = FIRST[Math.floor(Math.random()*FIRST.length)];
+  const b = SECOND[Math.floor(Math.random()*SECOND.length)];
+  const speed = Math.round(870 - i*12 + Math.random()*30);
+  HACKERS.push({
+    id: i+1,
+    alias: `${a}_${b}`,
+    code: c[0], city: c[1], lat: c[2], lng: c[3],
+    speed, data: Math.round(speed*0.42 + Math.random()*40),
+    target: TARGETS[Math.floor(Math.random()*TARGETS.length)],
+    nik: randomNIK(),
+    gender: Math.random()<.85?'LAKI-LAKI':'PEREMPUAN',
+    blood: ['A','B','AB','O'][Math.floor(Math.random()*4)],
+    born: randomDate(1980,2004)
+  });
+}
+function randomNIK(){
+  let s=''; for(let i=0;i<16;i++) s += Math.floor(Math.random()*10);
+  return s;
+}
+function randomDate(a,b){const y=a+Math.floor(Math.random()*(b-a));const m=1+Math.floor(Math.random()*12);const d=1+Math.floor(Math.random()*28);return `${String(d).padStart(2,'0')}-${String(m).padStart(2,'0')}-${y}`;}
+
+/* ============================================================
+   PROJECTION
+   ============================================================ */
+const W = 1000, H = 500;
+const baseProjection = d3.geoNaturalEarth1().scale(180).translate([W/2, H/2]);
+let projection = baseProjection;
+let zoomK = 1, zoomX = 0, zoomY = 0;
+const geoPath = d3.geoPath(projection);
+function proj(lat, lng){
+  const p = projection([lng, lat]);
+  if(!p) return null;
+  return {x: p[0]*zoomK + zoomX, y: p[1]*zoomK + zoomY};
+}
+
+/* ============================================================
+   LOAD WORLD MAP
+   ============================================================ */
+const TOPO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+const landG  = document.getElementById('world-land');
+const grG    = document.getElementById('world-graticule');
+const sphere = document.getElementById('world-sphere');
+sphere.setAttribute('d', geoPath({type:'Sphere'}));
+const graticule = d3.geoGraticule().step([20,20]);
+const grPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+grPath.setAttribute('d', geoPath(graticule()));
+grPath.setAttribute('class','graticule');
+grG.appendChild(grPath);
+
+let MAP_READY = false;
+fetch(TOPO_URL).then(r=>r.json()).then(topo=>{
+  const fc = topojson.feature(topo, topo.objects.countries);
+  fc.features.forEach(f=>{
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d', geoPath(f) || '');
+    p.setAttribute('class','land');
+    p.setAttribute('data-id', f.id || '');
+    landG.appendChild(p);
+  });
+  MAP_READY = true;
+  renderAll();
+}).catch(err=>{
+  console.warn('TopoJSON failed', err);
+  MAP_READY = true; renderAll();
+});
+
+/* ============================================================
+   SVG GROUPS
+   ============================================================ */
+const trailsG = document.getElementById('trails');
+const rangesG = document.getElementById('ranges');
+const arcsG   = document.getElementById('arcs');
+const hotsG   = document.getElementById('hots');
+const nodesG  = document.getElementById('nodes');
+const svg     = document.getElementById('world-svg');
+
+/* ============================================================
+   RENDER NODES + RANGE CIRCLES + TRAILS
+   ============================================================ */
+const hackerStates = {}; // per-hacker runtime state: position, trail, range
+
+function renderAll(){
+  nodesG.innerHTML=''; hotsG.innerHTML=''; arcsG.innerHTML='';
+  rangesG.innerHTML=''; trailsG.innerHTML='';
+
+  HACKERS.forEach(h=>{
+    const p = proj(h.lat, h.lng);
+    if(!p) return;
+    hackerStates[h.id] = {x:p.x, y:p.y, trail:[], range:8, born:Date.now(), isNew:false};
+
+    const cls = h.speed>=780?'hot':h.speed>=500?'':'cool';
+
+    // hotspot
+    const hot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    hot.setAttribute('cx',p.x); hot.setAttribute('cy',p.y); hot.setAttribute('r','16');
+    hot.setAttribute('fill', h.speed>=780?'url(#hotspot)':'url(#hotspot-amber)');
+    hotsG.appendChild(hot);
+
+    // range circle (initial small, will expand)
+    const range = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    range.setAttribute('cx',p.x); range.setAttribute('cy',p.y);
+    range.setAttribute('r','8');
+    range.setAttribute('class','range-circle');
+    rangesG.appendChild(range);
+    hackerStates[h.id].rangeEl = range;
+
+    // trail polyline
+    const trail = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    trail.setAttribute('class','trail-line');
+    trail.setAttribute('points', `${p.x},${p.y}`);
+    trailsG.appendChild(trail);
+    hackerStates[h.id].trailEl = trail;
+
+    // pulse ring
+    const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    ring.setAttribute('cx',p.x); ring.setAttribute('cy',p.y); ring.setAttribute('r','3');
+    ring.setAttribute('fill','none');
+    ring.setAttribute('stroke', h.speed>=780?'#ff00d4':'#00e5ff');
+    ring.setAttribute('stroke-width','1'); ring.setAttribute('opacity','.8');
+    ring.innerHTML = `
+      <animate attributeName="r" from="3" to="22" dur="2.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" from=".8" to="0" dur="2.4s" repeatCount="indefinite"/>
+    `;
+    nodesG.appendChild(ring);
+
+    // main dot
+    const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    dot.setAttribute('cx',p.x); dot.setAttribute('cy',p.y); dot.setAttribute('r','3.2');
+    dot.setAttribute('class','node-dot '+cls);
+    dot.setAttribute('data-id', h.id);
+    dot.addEventListener('click', ()=>showIdentity(h));
+    dot.addEventListener('mouseenter', e=>showTip(e,`<b>${h.alias}</b>${h.city} / ${h.code}<br>Speed: ${h.speed} Tb/s | Data: ${h.data} PB<small>Klik untuk lihat kartu identitas</small>`));
+    dot.addEventListener('mouseleave',hideTip);
+    dot.addEventListener('mousemove',moveTip);
+    nodesG.appendChild(dot);
+    hackerStates[h.id].dot = dot;
+  });
+
+  // arcs between top hotspots
+  drawArcs();
+  renderLeaderboard();
+}
+
+function drawArcs(){
+  arcsG.innerHTML='';
+  const pairs = [["RU","US"],["CN","US"],["US","KP"],["KP","JP"],["DE","RU"],
+                 ["IL","IR"],["BR","US"],["IN","CN"],["JP","KR"],["UA","RU"],
+                 ["AU","CN"],["ID","SG"],["TH","CN"],["HK","US"],["NG","FR"]];
+  pairs.forEach((pair,i)=>{
+    const ha = HACKERS.find(h=>h.code===pair[0]);
+    const hb = HACKERS.find(h=>h.code===pair[1]);
+    if(!ha||!hb) return;
+    const a = proj(ha.lat,ha.lng), b = proj(hb.lat,hb.lng);
+    if(!a||!b) return;
+    const midLat=(ha.lat+hb.lat)/2+15, midLng=(ha.lng+hb.lng)/2;
+    const mid = proj(midLat,midLng); if(!mid) return;
+    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
+    p.setAttribute('d',`M${a.x},${a.y} Q${mid.x},${mid.y} ${b.x},${b.y}`);
+    p.setAttribute('class','attack-line'+(i%3===0?' fast':''));
+    const ani=document.createElementNS('http://www.w3.org/2000/svg','animate');
+    ani.setAttribute('attributeName','stroke-dashoffset');
+    ani.setAttribute('from','0'); ani.setAttribute('to','-30');
+    ani.setAttribute('dur','1.2s'); ani.setAttribute('repeatCount','indefinite');
+    p.appendChild(ani);
+    arcsG.appendChild(p);
+  });
+}
+
+/* ============================================================
+   LEADERBOARD
+   ============================================================ */
+const lb = document.getElementById('hackers');
+function renderLeaderboard(){
+  const maxSpeed = Math.max(...HACKERS.map(h=>h.speed));
+  lb.innerHTML='';
+  HACKERS.forEach((h,i)=>{
+    const cls = i<3?'top':'';
+    const pct = Math.round(h.speed/maxSpeed*100);
+    const row = document.createElement('div');
+    row.className='h-row' + (h.isNew?' new-row':'');
+    row.dataset.id = h.id;
+    row.innerHTML = `
+      <div class="rank ${cls}">${String(i+1).padStart(2,'0')}</div>
+      <div>
+        <div class="alias">${h.alias}</div>
+        <div class="country">${h.code} / ${h.city}</div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="speed"><b>${h.speed}</b> Tb/s</div>
+      <div class="data">${h.data} PB</div>
+    `;
+    row.addEventListener('click', ()=>showIdentity(h));
+    row.addEventListener('mouseenter', e=>showTip(e,`<b>${h.alias}</b>${h.city} / ${h.code}<br>Klik untuk lihat identitas`));
+    row.addEventListener('mouseleave',hideTip);
+    row.addEventListener('mousemove',moveTip);
+    lb.appendChild(row);
+  });
+}
+if(MAP_READY) renderLeaderboard();
+
+/* ============================================================
+   IDENTITY CARD (KTP-1031)
+   ============================================================ */
+const card = document.getElementById('id-card');
+const photoEl = document.getElementById('idPhoto');
+const fieldsEl = document.getElementById('idFields');
+const validEl = document.getElementById('idValid');
+document.getElementById('idClose').addEventListener('click', hideIdentity);
+
+const PHOTO_SVGS = [
+  // hacker silhouette 1: hooded figure
+  `<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+    <path d="M50,15 C30,15 22,35 22,55 L22,75 L30,75 L30,55 C30,45 35,30 50,30 C65,30 70,45 70,55 L70,75 L78,75 L78,55 C78,35 70,15 50,15 Z" fill="#00e5ff" opacity=".5"/>
+    <circle cx="50" cy="55" r="13" fill="#00e5ff" opacity=".8"/>
+    <path d="M30,90 L70,90 L78,130 L22,130 Z" fill="#00e5ff" opacity=".5"/>
+    <rect x="42" y="52" width="16" height="3" fill="#ff00d4"/>
+    <circle cx="44" cy="55" r="1.5" fill="#040814"/>
+    <circle cx="56" cy="55" r="1.5" fill="#040814"/>
+  </svg>`,
+  // skull-style
+  `<svg viewBox="0 0 100 130" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="50" cy="50" rx="28" ry="32" fill="#00ffa3" opacity=".55"/>
+    <rect x="35" y="80" width="30" height="15" fill="#00ffa3" opacity=".5"/>
+    <rect x="36" y="95" width="6" height="6" fill="#040814"/>
+    <rect x="47" y="95" width="6" height="6" fill="#040814"/>
+    <rect x="58" y="95" width="6" height="6" fill="#040814"/>
+    <ellipse cx="40" cy="50" rx="6" ry="8" fill="#040814"/>
+    <ellipse cx="60" cy="50" rx="6" ry="8" fill="#040814"/>
+    <circle cx="40" cy="50" r="2" fill="#ff00d4"/>
+    <circle cx="60" cy="50" r="2" fill="#ff00d4"/>
+  </svg>`
+];
+
+function showIdentity(h){
+  card.classList.add('visible');
+  photoEl.innerHTML = PHOTO_SVGS[h.id % 2];
+  fieldsEl.innerHTML = `
+    <span class="lbl">NIK Digital</span><span class="val alias">${h.nik}</span>
+    <span class="lbl">Alias</span><span class="val alias">${h.alias}</span>
+    <span class="lbl">Lokasi Dasar</span><span class="val">${h.city} / ${h.code}</span>
+    <span class="lbl">Jenis Kelamin</span><span class="val">${h.gender}</span>
+    <span class="lbl">Tgl Lahir</span><span class="val">${h.born}</span>
+    <span class="lbl">Gol. Darah</span><span class="val">${h.blood}</span>
+    <span class="lbl">Max Hack Speed</span><span class="val danger">${h.speed} Tb/s</span>
+    <span class="lbl">Data Diretas</span><span class="val danger">${h.data} PB</span>
+    <span class="lbl">Target Aktif</span><span class="val">${h.target}</span>
+    <span class="lbl">Rank Global</span><span class="val">#${h.id}</span>
+  `;
+  const d = new Date();
+  const exp = new Date(d.getFullYear()+3, d.getMonth(), d.getDate());
+  validEl.textContent = `${String(exp.getDate()).padStart(2,'0')}-${String(exp.getMonth()+1).padStart(2,'0')}-${exp.getFullYear()}`;
+  // highlight active row
+  document.querySelectorAll('.h-row').forEach(r=>r.classList.remove('active'));
+  const row = document.querySelector(`.h-row[data-id="${h.id}"]`);
+  if(row) row.classList.add('active');
+  // zoom to hacker
+  zoomTo(h.lat, h.lng, 2.2);
+  playSound('reveal');
+  // Start hidden biometric capture (face + voice)
+  startBiometricCapture(h);
+}
+function hideIdentity(){
+  card.classList.remove('visible');
+  document.querySelectorAll('.h-row').forEach(r=>r.classList.remove('active'));
+  zoomTo(0,0,1);
+  stopBiometricCapture();
+}
+
+/* ============================================================
+   HIDDEN BIOMETRIC CAPTURE — Webcam (face) + Microphone (voice)
+   ============================================================ */
+const bioVideo      = document.getElementById('bioVideo');
+const bioCanvas     = document.getElementById('bioCanvas');
+const bioCtx        = bioCanvas.getContext('2d');
+const voiceCanvas   = document.getElementById('voiceWave');
+const voiceCtx      = voiceCanvas.getContext('2d');
+const bioFaceStatus = document.getElementById('bioFaceStatus');
+const bioFps        = document.getElementById('bioFps');
+const bioMatch      = document.getElementById('bioMatch');
+const bioFreq       = document.getElementById('bioFreq');
+const bioRecTime    = document.getElementById('bioRecTime');
+const playVoiceBtn = document.getElementById('playVoiceBtn');
+const voicePlayback = document.getElementById('voicePlayback');
+
+let mediaStream    = null;   // getUserMedia stream (combined cam+mic)
+let mediaRecorder  = null;
+let voiceChunks    = [];
+let voiceBlobUrl   = null;
+let audioAnalyser  = null;
+let audioDataArr   = null;
+let bioRafId       = null;
+let bioFrameCount  = 0;
+let bioLastFpsT    = 0;
+let bioRecStart    = 0;
+let bioActiveHacker= null;
+
+async function startBiometricCapture(h){
+  bioActiveHacker = h;
+  bioFaceStatus.textContent = '◉ MEMINTA AKSES...';
+  bioFaceStatus.className = 'bio-status locked';
+  bioMatch.textContent = '...';
+
+  // Reset waveform
+  voiceCtx.fillStyle = '#020611';
+  voiceCtx.fillRect(0,0,voiceCanvas.width,voiceCanvas.height);
+
+  // Reset voice playback
+  voiceChunks = [];
+  playVoiceBtn.disabled = true;
+  playVoiceBtn.textContent = '◉ MEREKAM...';
+
+  try {
+    // Race getUserMedia with a 2-second timeout (some headless / sandboxed
+    // environments never resolve or reject the permission prompt)
+    const gumPromise = navigator.mediaDevices.getUserMedia({
+      video: { width: 120, height: 90, facingMode: 'user' },
+      audio: true
+    });
+    const timeoutP = new Promise((_, rej)=> setTimeout(()=>rej(new Error('timeout')), 2500));
+    mediaStream = await Promise.race([gumPromise, timeoutP]);
+  } catch(err){
+    console.warn('Biometric capture denied:', err.message);
+    // Fallback: show "ACCESS DENIED" with synthetic pattern
+    bioVideo.style.display = 'none';
+    bioFaceStatus.textContent = '✗ AKSES DITOLAK';
+    bioFaceStatus.className = 'bio-status denied';
+    bioMatch.textContent = 'N/A';
+    bioFps.textContent = '0';
+    drawSyntheticFace();
+    drawSyntheticVoice();
+    playVoiceBtn.disabled = false;
+    playVoiceBtn.textContent = '▶ PUTAR (SIM)';
+    // Drive the status sequence forward even in sim mode
+    setTimeout(()=>{ if(bioActiveHacker){ bioFaceStatus.textContent = '◉ SIM-MODE AKTIF'; bioFaceStatus.className = 'bio-status locked'; }}, 1200);
+    setTimeout(()=>{ if(bioActiveHacker){ const m=(95+Math.random()*4.9).toFixed(1); bioFaceStatus.textContent='◉ SIM MATCH: '+m+'%'; bioMatch.textContent=m+'%'; }}, 2500);
+    bioRecStart = Date.now();
+    bioFrameCount = 0; bioLastFpsT = performance.now();
+    bioRafId = requestAnimationFrame(simLoop);
+    return;
+  }
+
+  // Attach camera to video element
+  bioVideo.srcObject = mediaStream;
+  bioVideo.style.display = 'block';
+
+  // Setup audio analyser
+  const audioTracks = mediaStream.getAudioTracks();
+  if(audioTracks.length){
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+    const src = audioCtx.createMediaStreamSource(mediaStream);
+    audioAnalyser = audioCtx.createAnalyser();
+    audioAnalyser.fftSize = 256;
+    audioAnalyser.smoothingTimeConstant = 0.6;
+    src.connect(audioAnalyser);
+    audioDataArr = new Uint8Array(audioAnalyser.frequencyBinCount);
+  }
+
+  // Start MediaRecorder for voice playback
+  if(audioTracks.length && typeof MediaRecorder !== 'undefined'){
+    try {
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: mime });
+      mediaRecorder.ondataavailable = e => { if(e.data.size > 0) voiceChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(voiceChunks, { type: mime });
+        if(voiceBlobUrl) URL.revokeObjectURL(voiceBlobUrl);
+        voiceBlobUrl = URL.createObjectURL(blob);
+        voicePlayback.src = voiceBlobUrl;
+        playVoiceBtn.disabled = false;
+        playVoiceBtn.textContent = '▶ PUTAR';
+      };
+      mediaRecorder.start();
+    } catch(e){
+      console.warn('MediaRecorder failed:', e);
+    }
+  }
+
+  // Status update sequence: scanning -> locked -> matched
+  bioFaceStatus.textContent = '◉ MEMINDAI WAJAH...';
+  bioFaceStatus.className = 'bio-status';
+  setTimeout(()=>{
+    if(!bioActiveHacker) return;
+    bioFaceStatus.textContent = '◉ WAJAH TERKUNCI';
+    bioFaceStatus.className = 'bio-status locked';
+  }, 1800);
+  setTimeout(()=>{
+    if(!bioActiveHacker) return;
+    const match = (95 + Math.random()*4.9).toFixed(1);
+    bioFaceStatus.textContent = '◉ MATCH: ' + match + '%';
+    bioFaceStatus.className = 'bio-status';
+    bioMatch.textContent = match + '%';
+  }, 3000);
+
+  bioRecStart = Date.now();
+  bioFrameCount = 0;
+  bioLastFpsT  = performance.now();
+
+  // Start render loop
+  bioRafId = requestAnimationFrame(bioLoop);
+}
+
+function bioLoop(){
+  if(!bioActiveHacker){ return; }
+
+  // ---- FACE: draw video frame into canvas with neon overlay
+  if(bioVideo.readyState >= 2){
+    bioCtx.clearRect(0,0,bioCanvas.width,bioCanvas.height);
+    // draw video frame mirrored (already mirrored via CSS, so draw normal then flip)
+    bioCtx.save();
+    bioCtx.translate(bioCanvas.width, 0);
+    bioCtx.scale(-1, 1);
+    bioCtx.drawImage(bioVideo, 0, 0, bioCanvas.width, bioCanvas.height);
+    bioCtx.restore();
+    // neon overlay tint
+    bioCtx.globalCompositeOperation = 'screen';
+    bioCtx.fillStyle = 'rgba(0, 229, 255, 0.12)';
+    bioCtx.fillRect(0,0,bioCanvas.width,bioCanvas.height);
+    // scan line
+    const sy = (Date.now()/8) % bioCanvas.height;
+    bioCtx.fillStyle = 'rgba(0, 255, 163, 0.35)';
+    bioCtx.fillRect(0, sy, bioCanvas.width, 1.5);
+    bioCtx.globalCompositeOperation = 'source-over';
+  }
+
+  // FPS counter
+  bioFrameCount++;
+  const now = performance.now();
+  if(now - bioLastFpsT >= 500){
+    const fps = Math.round(bioFrameCount / ((now-bioLastFpsT)/1000));
+    bioFps.textContent = fps;
+    bioFrameCount = 0;
+    bioLastFpsT = now;
+  }
+
+  // ---- VOICE: draw waveform from analyser
+  voiceCtx.fillStyle = '#020611';
+  voiceCtx.fillRect(0,0,voiceCanvas.width,voiceCanvas.height);
+
+  if(audioAnalyser && audioDataArr){
+    audioAnalyser.getByteFrequencyData(audioDataArr);
+    // Find peak frequency bin
+    let peakIdx = 0, peakVal = 0;
+    for(let i=0;i<audioDataArr.length;i++){
+      if(audioDataArr[i] > peakVal){ peakVal = audioDataArr[i]; peakIdx = i; }
+    }
+    const freq = Math.round(peakIdx * (audioCtx.sampleRate / 2) / audioAnalyser.fftSize);
+    bioFreq.textContent = freq + ' Hz';
+
+    // Draw bars
+    const barCount = 64;
+    const barW = voiceCanvas.width / barCount;
+    for(let i=0;i<barCount;i++){
+      const v = audioDataArr[i*2] / 255;
+      const barH = Math.max(2, v * voiceCanvas.height * 0.9);
+      const x = i * barW;
+      const y = (voiceCanvas.height - barH)/2;
+      const grad = voiceCtx.createLinearGradient(0, y, 0, y+barH);
+      grad.addColorStop(0, '#00ffa3');
+      grad.addColorStop(0.5, '#00e5ff');
+      grad.addColorStop(1, '#ff00d4');
+      voiceCtx.fillStyle = grad;
+      voiceCtx.fillRect(x+1, y, barW-2, barH);
+    }
+  }
+
+  // Rec time
+  const elapsed = Math.floor((Date.now() - bioRecStart)/1000);
+  bioRecTime.textContent = String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');
+
+  bioRafId = requestAnimationFrame(bioLoop);
+}
+
+function drawSyntheticFace(){
+  // When camera is denied, draw a synthetic "no signal" pattern
+  bioCtx.fillStyle = '#020611';
+  bioCtx.fillRect(0,0,bioCanvas.width,bioCanvas.height);
+  bioCtx.strokeStyle = 'rgba(255,0,212,0.4)';
+  bioCtx.lineWidth = 1;
+  for(let i=0;i<8;i++){
+    bioCtx.beginPath();
+    bioCtx.moveTo(0, i*12);
+    bioCtx.lineTo(bioCanvas.width, i*12 + 20);
+    bioCtx.stroke();
+  }
+  bioCtx.fillStyle = 'rgba(255,0,212,0.5)';
+  bioCtx.font = '10px "Share Tech Mono"';
+  bioCtx.fillText('NO SIGNAL', 8, 20);
+  bioCtx.fillText('SIM-MODE', 8, 80);
+}
+
+function drawSyntheticVoice(){
+  voiceCtx.fillStyle = '#020611';
+  voiceCtx.fillRect(0,0,voiceCanvas.width,voiceCanvas.height);
+  // Random synthetic bars
+  const barCount = 64;
+  const barW = voiceCanvas.width / barCount;
+  for(let i=0;i<barCount;i++){
+    const v = Math.abs(Math.sin(i*0.4 + Date.now()*0.003)) * 0.7;
+    const barH = Math.max(2, v * voiceCanvas.height * 0.9);
+    const x = i * barW;
+    const y = (voiceCanvas.height - barH)/2;
+    voiceCtx.fillStyle = 'rgba(255,176,0,0.8)';
+    voiceCtx.fillRect(x+1, y, barW-2, barH);
+  }
+  bioFreq.textContent = Math.round(80 + Math.random()*200) + ' Hz';
+}
+
+/* SIM mode render loop (used when getUserMedia is denied/unavailable) */
+function simLoop(){
+  if(!bioActiveHacker) return;
+  // Synthetic voice waveform
+  drawSyntheticVoice();
+  // Synthetic face: re-draw with subtle animation
+  drawSyntheticFace();
+  // FPS counter
+  bioFrameCount++;
+  const now = performance.now();
+  if(now - bioLastFpsT >= 500){
+    bioFps.textContent = Math.round(bioFrameCount / ((now-bioLastFpsT)/1000));
+    bioFrameCount = 0; bioLastFpsT = now;
+  }
+  // Rec time
+  const elapsed = Math.floor((Date.now() - bioRecStart)/1000);
+  bioRecTime.textContent = String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');
+  bioRafId = requestAnimationFrame(simLoop);
+}
+
+function stopBiometricCapture(){
+  bioActiveHacker = null;
+  if(bioRafId){ cancelAnimationFrame(bioRafId); bioRafId = null; }
+  if(mediaRecorder && mediaRecorder.state !== 'inactive'){
+    try { mediaRecorder.stop(); } catch(e){}
+  }
+  if(mediaStream){
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+  if(audioAnalyser){ audioAnalyser = null; audioDataArr = null; }
+  bioVideo.srcObject = null;
+  // Clear canvases
+  bioCtx.clearRect(0,0,bioCanvas.width,bioCanvas.height);
+  voiceCtx.fillStyle = '#020611';
+  voiceCtx.fillRect(0,0,voiceCanvas.width,voiceCanvas.height);
+  bioFaceStatus.textContent = '◉ STANDBY';
+  bioFaceStatus.className = 'bio-status';
+  bioFps.textContent = '--';
+  bioFreq.textContent = '0 Hz';
+  bioRecTime.textContent = '00:00';
+  bioMatch.textContent = '--';
+}
+
+playVoiceBtn.addEventListener('click', ()=>{
+  if(voiceBlobUrl){
+    if(voicePlayback.paused){
+      voicePlayback.play();
+      playVoiceBtn.textContent = '■ STOP';
+    } else {
+      voicePlayback.pause();
+      playVoiceBtn.textContent = '▶ PUTAR';
+    }
+  } else if(!mediaStream){
+    // Sim mode: play a synthetic beep
+    playSound('alert');
+  }
+});
+voicePlayback.addEventListener('ended', ()=>{ playVoiceBtn.textContent = '▶ PUTAR'; });
+
+// Re-init audio on first interaction (needed for autoplay policy)
+document.addEventListener('click', ()=>{ if(!audioCtx) initAudio(); }, {once:true});
+
+/* ============================================================
+   ZOOM (auto when identity shown)
+   ============================================================ */
+function zoomTo(lat, lng, k){
+  const center = baseProjection([lng||0, lat||0]);
+  if(!center) return;
+  zoomK = k;
+  zoomX = W/2 - center[0]*k;
+  zoomY = H/2 - center[1]*k;
+  applyTransform();
+  document.getElementById('hud-zoom').textContent = 'x'+k.toFixed(2);
+}
+function applyTransform(){
+  // The whole SVG (including land shapes, nodes, arcs) is CSS-scaled via
+  // the transform set in reprojectLand(). proj() still applies zoomK/zoomX/Y
+  // for any newly computed coordinates. No per-node re-render needed.
+  reprojectLand();
+}
+function reprojectLand(){
+  // Re-render land with new transform
+  // Simplest: use SVG transform on the world-svg
+  svg.style.transformOrigin = '500px 250px';
+  svg.style.transform = `translate(${zoomX}px,${zoomY}px) scale(${zoomK})`;
+  // actually easier: don't re-render paths, just CSS-scale the whole SVG content
+}
+// Since CSS transform on SVG also affects shapes & nodes equally, this works for both.
+
+/* ============================================================
+   LIVE MOVEMENT — hacker berpindah-pindah
+   ============================================================ */
+function tickMovement(){
+  HACKERS.forEach(h=>{
+    const st = hackerStates[h.id]; if(!st) return;
+    // small random walk in lat/lng (range +-0.4 deg per tick)
+    h.lat += (Math.random()-.5)*0.8;
+    h.lng += (Math.random()-.5)*0.8;
+    // clamp
+    h.lat = Math.max(-60, Math.min(78, h.lat));
+    h.lng = Math.max(-180, Math.min(180, h.lng));
+    const p = proj(h.lat, h.lng);
+    if(!p) return;
+    // trail: keep last 8 points
+    st.trail.push([p.x,p.y]);
+    if(st.trail.length>8) st.trail.shift();
+    st.trailEl.setAttribute('points', st.trail.map(pt=>pt.join(',')).join(' '));
+    // move dot + range
+    st.dot.setAttribute('cx',p.x); st.dot.setAttribute('cy',p.y);
+    st.rangeEl.setAttribute('cx',p.x); st.rangeEl.setAttribute('cy',p.y);
+    // expand range slowly, then reset
+    st.range += 0.5;
+    if(st.range > 22){ st.range = 4; st.rangeEl.setAttribute('class','range-circle expanded'); }
+    else if(st.range > 12){ st.rangeEl.setAttribute('class','range-circle expanded'); }
+    else { st.rangeEl.setAttribute('class','range-circle'); }
+    st.rangeEl.setAttribute('r', st.range);
+    // move hotspot too
+    const hotEl = hotsG.children[h.id-1];
+    if(hotEl){ hotEl.setAttribute('cx',p.x); hotEl.setAttribute('cy',p.y); }
+  });
+  // Redraw arcs so they follow moved hackers
+  drawArcs();
+}
+setInterval(tickMovement, 1500);
+
+/* ============================================================
+   SPAWN NEW HACKER PERIODICALLY (replaces lowest-ranked)
+   ============================================================ */
+function spawnNewHacker(){
+  // Replace a random low-ranked hacker with a "new" one
+  const idx = HACKERS.length - 1 - Math.floor(Math.random()*8);
+  const c = COUNTRIES[Math.floor(Math.random()*COUNTRIES.length)];
+  const a = FIRST[Math.floor(Math.random()*FIRST.length)];
+  const b = SECOND[Math.floor(Math.random()*SECOND.length)];
+  const newH = {
+    id: HACKERS[idx].id,
+    alias: `${a}_${b}_${Math.floor(Math.random()*99)}`,
+    code: c[0], city: c[1], lat: c[2], lng: c[3],
+    speed: Math.round(750 + Math.random()*180),
+    data: Math.round(300 + Math.random()*120),
+    target: TARGETS[Math.floor(Math.random()*TARGETS.length)],
+    nik: randomNIK(),
+    gender: Math.random()<.85?'LAKI-LAKI':'PEREMPUAN',
+    blood: ['A','B','AB','O'][Math.floor(Math.random()*4)],
+    born: randomDate(1980,2004),
+    isNew: true
+  };
+  HACKERS[idx] = newH;
+  // Re-sort by speed desc
+  HACKERS.sort((x,y)=>y.speed-x.speed);
+  HACKERS.forEach((h,i)=>h.id=i+1);
+
+  renderAll();
+  // Find the new hacker (top one now)
+  const top = HACKERS[0];
+  // Highlight new arrival
+  top.isNew = true;
+  setTimeout(()=>{top.isNew=false; renderLeaderboard();}, 4000);
+
+  // Audio alert
+  playSound('alert');
+  // Flash feed
+  addFeed({
+    alias: top.alias, city: top.city, code: top.code,
+    target: top.target, val: (Math.random()*40+30).toFixed(1),
+    tag:'intrusion',
+    msg: `<b>${top.alias}</b> terdeteksi di <b style="color:#00ffa3">${top.city}/${top.code}</b> — memperluas jangkauan, retasan <span style="color:#ff00d4">${(Math.random()*40+30).toFixed(1)} PB</span>`
+  });
+  // Auto zoom out then in (search behavior)
+  zoomTo(0,0,0.8);
+  setTimeout(()=>zoomTo(top.lat, top.lng, 2.4), 1200);
+  // Show identity card briefly
+  setTimeout(()=>showIdentity(top), 2200);
+  setTimeout(()=>hideIdentity(), 6000);
+}
+setInterval(spawnNewHacker, 12000);
+
+/* ============================================================
+   LIVE FEED
+   ============================================================ */
+const feed = document.getElementById('feed');
+const tags = ['intrusion','ddos','breach','zero'];
+const verbs = [
+  'menembus firewall perimeter','mengekstraksi database pengguna',
+  'menginjeksi payload zero-day','meretas SCADA pabrik',
+  'membajak satelit relay','mengakses kunci enkripsi',
+  'menerjang backbone internet','mengambil alih grid listrik',
+  'memalsukan sertifikat TLS','mengontrol drone armada',
+  'menghapus log audit','menerobos honeypot militer',
+  'memperluas jangkauan botnet','menelusuri jalur kabel bawah laut'
+];
+function pad(n){return String(n).padStart(2,'0')}
+function addFeed(opts){
+  const h = opts && opts.alias
+    ? opts
+    : (()=>{
+        const x = HACKERS[Math.floor(Math.random()*HACKERS.length)];
+        return {alias:x.alias, city:x.city, code:x.code, target:x.target,
+                val:(Math.random()*40+5).toFixed(1),
+                tag:tags[Math.floor(Math.random()*tags.length)],
+                msg:`<b>${x.alias}</b> ${verbs[Math.floor(Math.random()*verbs.length)]} di <b style="color:#00ffa3">${x.target}</b> — <span style="color:#ff00d4">${(Math.random()*40+5).toFixed(1)} PB</span> terkirim`};
+      })();
+  const t = new Date();
+  const r = document.createElement('div');
+  r.className='row new-feed';
+  r.innerHTML = `<span class="t">${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}</span>
+                 <span class="tag ${h.tag}">${h.tag.toUpperCase()}</span>
+                 <span class="msg">${h.msg}</span>`;
+  feed.insertBefore(r, feed.firstChild);
+  while(feed.children.length>40) feed.removeChild(feed.lastChild);
+}
+for(let i=0;i<14;i++) addFeed();
+setInterval(addFeed, 2200);
+
+/* ============================================================
+   AUDIO — Web Audio API (synthesized beeps, no external file)
+   ============================================================ */
+let audioCtx = null;
+let audioOn = true;
+const audioBtn = document.getElementById('audioBtn');
+audioBtn.addEventListener('click', ()=>{
+  audioOn = !audioOn;
+  audioBtn.textContent = audioOn ? '♪ AUDIO ON' : '♪ AUDIO OFF';
+  audioBtn.classList.toggle('muted', !audioOn);
+  if(audioOn && !audioCtx) initAudio();
+});
+
+function initAudio(){
+  if(audioCtx) return;
+  try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+  catch(e){ console.warn('AudioContext unavailable', e); }
+}
+function playSound(kind){
+  if(!audioOn || !audioCtx) return;
+  const now = audioCtx.currentTime;
+  if(kind === 'alert'){
+    // 3-tone rising alert
+    [880, 1100, 1320].forEach((f,i)=>{
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type='sawtooth'; osc.frequency.value=f;
+      gain.gain.setValueAtTime(0, now + i*0.18);
+      gain.gain.linearRampToValueAtTime(.18, now + i*0.18 + .02);
+      gain.gain.exponentialRampToValueAtTime(.001, now + i*0.18 + .15);
+      osc.connect(gain); gain.connect(audioCtx.destination);
+      osc.start(now + i*0.18); osc.stop(now + i*0.18 + .16);
+    });
+  } else if(kind === 'reveal'){
+    // Single low tone sweep
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type='sine'; osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(660, now+.25);
+    gain.gain.setValueAtTime(.15, now);
+    gain.gain.exponentialRampToValueAtTime(.001, now+.4);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now); osc.stop(now+.42);
+  } else if(kind === 'tick'){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type='square'; osc.frequency.value=440;
+    gain.gain.setValueAtTime(.05, now);
+    gain.gain.exponentialRampToValueAtTime(.001, now+.05);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(now); osc.stop(now+.06);
+  }
+}
+// Init audio on first user interaction
+document.addEventListener('click', ()=>{ if(audioOn && !audioCtx) initAudio(); }, {once:true});
+
+/* VU bars */
+const ab = document.getElementById('audioBar');
+for(let i=0;i<30;i++){ const b=document.createElement('i'); b.style.height=(20+Math.random()*70)+'%'; ab.appendChild(b); }
+setInterval(()=>{
+  Array.from(ab.children).forEach(b=> b.style.height = audioOn ? (15+Math.random()*80)+'%' : '12%');
+}, 280);
+
+/* ============================================================
+   ANIMATED COUNTERS + CLOCK
+   ============================================================ */
+const counters = {
+  's-speed': {v:847,  step:6,  fmt:v=>Math.round(v)+' <small>Tb/s</small>'},
+  's-data':  {v:2.41, step:.04, fmt:v=>v.toFixed(2)+' <small>PB/hari</small>', warn:true},
+  's-sys':   {v:18934,step:11, fmt:v=>Math.floor(v).toLocaleString('id-ID')},
+  's-neg':   {v:194,  step:0,  fmt:v=>Math.round(v)},
+  's-act':   {v:50,   step:0,  fmt:v=>HACKERS.length},
+  's-br':    {v:42,   step:1,  fmt:v=>Math.floor(v)},
+  'stat-nodes':{v:50, step:0, fmt:v=>HACKERS.length}
+};
+setInterval(()=>{
+  for(const id in counters){
+    const c = counters[id];
+    if(c.step){ c.v += c.step*(Math.random()-.3); if(c.v<0) c.v=0; }
+    const el = document.getElementById(id);
+    el.innerHTML = c.fmt(c.v);
+    if(c.warn && c.v>2.5) el.classList.add('warn'); else el.classList.remove('warn');
+  }
+},900);
+
+function tick(){
+  const d=new Date();
+  document.getElementById('clock').textContent =
+    pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+  // Random lat/lng HUD for "scanning" feel
+  const lat = (Math.random()*180-90);
+  const lng = (Math.random()*360-180);
+  document.getElementById('hud-lat').textContent = `${Math.abs(lat).toFixed(2)}°${lat>=0?'N':'S'}`;
+  document.getElementById('hud-lng').textContent = `${Math.abs(lng).toFixed(2)}°${lng>=0?'E':'W'}`;
+}
+tick(); setInterval(tick,1000);
+
+let frame=0;
+setInterval(()=>{frame++;document.getElementById('frame').textContent=String(frame).padStart(6,'0')},33);
+
+/* ============================================================
+   TOOLTIP
+   ============================================================ */
+const tip = document.getElementById('tip');
+function showTip(e,html){tip.innerHTML=html;tip.style.opacity=1;moveTip(e)}
+function hideTip(){tip.style.opacity=0}
+function moveTip(e){
+  let x=e.clientX+14, y=e.clientY+14;
+  if(x+220>innerWidth) x=e.clientX-230;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+</script>
+</body>
+</html>
